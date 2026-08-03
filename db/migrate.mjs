@@ -41,6 +41,16 @@ const STATEMENTS = [
     used boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
+  // Rate limit on POST /api/atrum/gate -- the one route in this app an outside
+  // attacker can hit directly, unauthenticated, as many times as they like.
+  // Access-code entropy is the primary defense; this is defense-in-depth
+  // against casual scripted guessing, per gateAttempts.ts.
+  `CREATE TABLE IF NOT EXISTS gate_attempts (
+    id bigserial PRIMARY KEY,
+    ip text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS gate_attempts_ip_created_idx ON gate_attempts (ip, created_at)`,
 ];
 
 for (const sql of STATEMENTS) {
