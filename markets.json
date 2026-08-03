@@ -11,7 +11,15 @@
       "resolver": "0xe906410566ad77B24335aB89587c5781a0bBBd92",
       "bettingCloseTime": 1786369324,
       "resolutionStartTime": 1786373584,
-      "createdAt": 1785765124
+      "createdAt": 1785765124,
+      "spec": {
+        "priceId": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+        "threshold": "6500000000000",
+        "thresholdExpo": -8,
+        "targetTime": 1786369924,
+        "windowSeconds": 3600,
+        "greaterThan": true
+      }
     },
     {
       "id": 41,
@@ -22,7 +30,15 @@
       "resolver": "0xe906410566ad77B24335aB89587c5781a0bBBd92",
       "bettingCloseTime": 1786369345,
       "resolutionStartTime": 1786373605,
-      "createdAt": 1785765145
+      "createdAt": 1785765145,
+      "spec": {
+        "priceId": "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+        "threshold": "200000000000",
+        "thresholdExpo": -8,
+        "targetTime": 1786369945,
+        "windowSeconds": 3600,
+        "greaterThan": true
+      }
     },
     {
       "id": 42,
@@ -33,7 +49,34 @@
       "resolver": "0xe906410566ad77B24335aB89587c5781a0bBBd92",
       "bettingCloseTime": 1786369369,
       "resolutionStartTime": 1786373629,
-      "createdAt": 1785765169
+      "createdAt": 1785765169,
+      "spec": {
+        "priceId": "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d",
+        "threshold": "8000000000",
+        "thresholdExpo": -8,
+        "targetTime": 1786369969,
+        "windowSeconds": 3600,
+        "greaterThan": true
+      }
+    },
+    {
+      "id": 43,
+      "question": "Will BTC be above $63,250 at 2026-08-03T14:50:43.000Z?",
+      "category": "Crypto",
+      "resolverType": "oracle",
+      "vault": "0x9596C50276e8E915791a13C28f6bB9C6dDE1a3f5",
+      "resolver": "0xe906410566ad77B24335aB89587c5781a0bBBd92",
+      "bettingCloseTime": 1785768043,
+      "resolutionStartTime": 1785768823,
+      "createdAt": 1785766843,
+      "spec": {
+        "priceId": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+        "threshold": "6325000000000",
+        "thresholdExpo": -8,
+        "targetTime": 1785768643,
+        "windowSeconds": 300,
+        "greaterThan": true
+      }
     }
   ]
 }
