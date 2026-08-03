@@ -22,7 +22,7 @@ export interface RedeemResult {
 }
 
 export async function redeem(owner: string, noteId: string): Promise<RedeemResult> {
-  const spent = getNote(owner, noteId);
+  const spent = await getNote(owner, noteId);
   if (spent.outcome !== 1 && spent.outcome !== 2) throw new Error("that note is not a YES/NO position");
   if (spent.status === "spent") throw new Error("that note is already spent");
   if (spent.status !== "grafted") throw new Error("that note is still queued -- wait for the next graft");
@@ -84,7 +84,7 @@ export async function redeem(owner: string, noteId: string): Promise<RedeemResul
   const provingMs = Date.now() - t0;
 
   const id = settledCommitment.toString(16).slice(0, 8);
-  addNote({
+  await addNote({
     id,
     owner,
     commitment: settledCommitment.toString(),
@@ -102,12 +102,12 @@ export async function redeem(owner: string, noteId: string): Promise<RedeemResul
   try {
     result = await relay("redeemPrivate", proof, [root, rpNullifierHash, settledCommitment, redeemMeta]);
   } catch (error) {
-    removeNote(owner, id);
+    await removeNote(owner, id);
     throw error;
   }
 
-  updateNote(owner, id, { txHash: result.hash });
-  updateNote(owner, spent.id, { status: "spent" });
+  await updateNote(owner, id, { txHash: result.hash });
+  await updateNote(owner, spent.id, { status: "spent" });
 
   return {
     id,

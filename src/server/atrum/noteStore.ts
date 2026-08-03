@@ -1,8 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
-import { join } from "node:path";
+import { db } from "./db";
 
 /**
- * Per-owner note storage.
+ * Per-owner note storage, backed by Postgres.
  *
  * WHAT THIS COSTS IN TRUST, STATED PLAINLY. A note's `nullifier` and `secret` are what spend
  * it, and they live here in the clear. That is only defensible because proving ALSO runs on
@@ -16,6 +15,10 @@ import { join } from "node:path";
  *
  * Keyed by lowercased owner address. Auth is in `auth.ts`: reading or writing a key requires a
  * signature from that address, so one user cannot enumerate another's notes.
+ *
+ * Previously a flat file (`.data/notes.json`) -- moved to Postgres because a serverless
+ * deployment's filesystem is ephemeral and not shared across invocations, so a file-backed
+ * store silently loses notes the moment more than one instance is running.
  */
 export type NoteStatus = "queued" | "grafted" | "spent";
 
@@ -34,50 +37,99 @@ export interface StoredNote {
   txHash?: string;
 }
 
-const DATA_DIR = join(process.cwd(), ".data");
-const DATA_FILE = join(DATA_DIR, "notes.json");
-
-function readAll(): StoredNote[] {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  if (!existsSync(DATA_FILE)) return [];
-  return JSON.parse(readFileSync(DATA_FILE, "utf8"));
+interface NoteRow {
+  id: string;
+  owner: string;
+  commitment: string;
+  nullifier: string;
+  secret: string;
+  market_id: string;
+  outcome: number;
+  units: string;
+  status: NoteStatus;
+  label: string;
+  created_at: string;
+  tx_hash: string | null;
 }
 
-/** Write via a temp file + rename, so a crash mid-write cannot truncate the note DB. */
-function writeAll(notes: StoredNote[]): void {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  const tmp = `${DATA_FILE}.tmp`;
-  writeFileSync(tmp, JSON.stringify(notes, null, 2));
-  renameSync(tmp, DATA_FILE);
+function fromRow(row: NoteRow): StoredNote {
+  return {
+    id: row.id,
+    owner: row.owner,
+    commitment: row.commitment,
+    nullifier: row.nullifier,
+    secret: row.secret,
+    marketId: row.market_id,
+    outcome: row.outcome,
+    units: row.units,
+    status: row.status,
+    label: row.label,
+    createdAt: Number(row.created_at),
+    txHash: row.tx_hash ?? undefined,
+  };
 }
 
 const key = (owner: string) => owner.toLowerCase();
 
-export function loadNotes(owner: string): StoredNote[] {
-  return readAll().filter((n) => n.owner === key(owner));
+export async function loadNotes(owner: string): Promise<StoredNote[]> {
+  const { rows } = await db().query<NoteRow>("SELECT * FROM notes WHERE owner = $1 ORDER BY created_at ASC", [
+    key(owner),
+  ]);
+  return rows.map(fromRow);
 }
 
-export function addNote(note: StoredNote): void {
-  const notes = readAll();
-  notes.push({ ...note, owner: key(note.owner) });
-  writeAll(notes);
+export async function addNote(note: StoredNote): Promise<void> {
+  await db().query(
+    `INSERT INTO notes (id, owner, commitment, nullifier, secret, market_id, outcome, units, status, label, created_at, tx_hash)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+    [
+      note.id,
+      key(note.owner),
+      note.commitment,
+      note.nullifier,
+      note.secret,
+      note.marketId,
+      note.outcome,
+      note.units,
+      note.status,
+      note.label,
+      note.createdAt,
+      note.txHash ?? null,
+    ],
+  );
 }
 
-export function updateNote(owner: string, id: string, patch: Partial<StoredNote>): void {
-  const notes = readAll();
-  const idx = notes.findIndex((n) => n.id === id && n.owner === key(owner));
-  if (idx === -1) throw new Error(`no such note ${id}`);
-  notes[idx] = { ...notes[idx], ...patch };
-  writeAll(notes);
+export async function updateNote(owner: string, id: string, patch: Partial<StoredNote>): Promise<void> {
+  const existing = await getNote(owner, id);
+  const merged: StoredNote = { ...existing, ...patch };
+  const { rowCount } = await db().query(
+    `UPDATE notes SET commitment=$3, nullifier=$4, secret=$5, market_id=$6, outcome=$7, units=$8,
+       status=$9, label=$10, tx_hash=$11
+     WHERE id=$1 AND owner=$2`,
+    [
+      id,
+      key(owner),
+      merged.commitment,
+      merged.nullifier,
+      merged.secret,
+      merged.marketId,
+      merged.outcome,
+      merged.units,
+      merged.status,
+      merged.label,
+      merged.txHash ?? null,
+    ],
+  );
+  if (rowCount === 0) throw new Error(`no such note ${id}`);
 }
 
-export function getNote(owner: string, id: string): StoredNote {
-  const note = readAll().find((n) => n.id === id && n.owner === key(owner));
-  if (!note) throw new Error(`no such note ${id}`);
-  return note;
+export async function getNote(owner: string, id: string): Promise<StoredNote> {
+  const { rows } = await db().query<NoteRow>("SELECT * FROM notes WHERE id = $1 AND owner = $2", [id, key(owner)]);
+  if (rows.length === 0) throw new Error(`no such note ${id}`);
+  return fromRow(rows[0]);
 }
 
 /** Drops a note persisted before broadcast whose transaction never landed. */
-export function removeNote(owner: string, id: string): void {
-  writeAll(readAll().filter((n) => !(n.id === id && n.owner === key(owner))));
+export async function removeNote(owner: string, id: string): Promise<void> {
+  await db().query("DELETE FROM notes WHERE id = $1 AND owner = $2", [id, key(owner)]);
 }

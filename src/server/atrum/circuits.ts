@@ -1,6 +1,6 @@
 import { statSync, openSync, readSync, closeSync } from "node:fs";
 import { join } from "node:path";
-import { ATRUM_CORE_DIR } from "./chain";
+import { CIRCUITS_DIR } from "./chain";
 
 /**
  * Real facts about the circuits this deployment actually proves against.
@@ -64,7 +64,7 @@ export function circuitFacts(name: string): CircuitFacts {
   const hit = cache.get(name);
   if (hit) return hit;
 
-  const build = join(ATRUM_CORE_DIR, "circuits", "build");
+  const build = CIRCUITS_DIR;
   const facts: CircuitFacts = {
     name,
     constraints: readConstraints(join(build, `${name}.r1cs`)),

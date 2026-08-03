@@ -26,7 +26,7 @@ export async function withdraw(
   amount: number,
   recipient: string,
 ): Promise<WithdrawResult> {
-  const spent = getNote(owner, noteId);
+  const spent = await getNote(owner, noteId);
   if (spent.outcome !== 0 && spent.outcome !== 3) {
     throw new Error("only UNBET collateral or a SETTLED payout can be withdrawn");
   }
@@ -108,7 +108,7 @@ export async function withdraw(
   let changeId: string | null = null;
   if (change > 0n) {
     changeId = changeCommitment.toString(16).slice(0, 8);
-    addNote({
+    await addNote({
       id: changeId,
       owner,
       commitment: changeCommitment.toString(),
@@ -127,12 +127,12 @@ export async function withdraw(
   try {
     result = await relay("withdraw", proof, [root, wdNullifierHash, changeCommitment, withdrawData]);
   } catch (error) {
-    if (changeId) removeNote(owner, changeId);
+    if (changeId) await removeNote(owner, changeId);
     throw error;
   }
 
-  if (changeId) updateNote(owner, changeId, { txHash: result.hash });
-  updateNote(owner, spent.id, { status: "spent" });
+  if (changeId) await updateNote(owner, changeId, { txHash: result.hash });
+  await updateNote(owner, spent.id, { status: "spent" });
 
   return {
     changeId,

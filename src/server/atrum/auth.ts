@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { verifyMessage, getAddress } from "viem";
+import { db } from "./db";
 
 /**
  * Signature-based sessions.
@@ -36,8 +37,11 @@ export function nonceMessage(nonce: string): string {
   ].join("\n");
 }
 
-export function newNonce(): string {
-  return randomBytes(16).toString("hex");
+/** Issues a nonce and records it as unused, so it can only ever be redeemed once. */
+export async function newNonce(): Promise<string> {
+  const nonce = randomBytes(16).toString("hex");
+  await db().query("INSERT INTO auth_nonces (nonce) VALUES ($1)", [nonce]);
+  return nonce;
 }
 
 function sign(payload: string): string {
@@ -66,13 +70,18 @@ function verify(token: string): string | null {
 /**
  * Verify a wallet signature over our nonce and issue a session.
  *
- * The nonce is echoed back by the client rather than tracked server-side. That is a deliberate
- * simplification with a real limit: it does not prevent replay of a signature the user already
- * produced. For a testnet deployment where a session grants access only to notes the signer
- * already owns, that is an acceptable trade; a production build needs server-issued,
- * single-use nonces.
+ * The nonce is server-issued and single-use: `newNonce` records it unused, and this consumes
+ * it atomically (the UPDATE only affects a row that is still unused) before checking the
+ * signature. A previously-used nonce is rejected up front, which is what stops a signature the
+ * user already produced from being replayed.
  */
 export async function signIn(address: string, nonce: string, signature: `0x${string}`): Promise<string> {
+  const { rowCount } = await db().query(
+    "UPDATE auth_nonces SET used = true, address = $2 WHERE nonce = $1 AND used = false",
+    [nonce, address.toLowerCase()],
+  );
+  if (rowCount === 0) throw new Error("nonce is unknown or already used");
+
   const checksummed = getAddress(address);
   const ok = await verifyMessage({ address: checksummed, message: nonceMessage(nonce), signature });
   if (!ok) throw new Error("signature does not match that address");

@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as snarkjs from "snarkjs";
-import { ATRUM_CORE_DIR } from "./chain";
+import { CIRCUITS_DIR } from "./chain";
 
-const BUILD = join(ATRUM_CORE_DIR, "circuits", "build");
+const BUILD = CIRCUITS_DIR;
 
 export interface ProofResult {
   pA: readonly [bigint, bigint];

@@ -9,17 +9,17 @@ import { isGrafted } from "./sequencerClient";
 const ABANDONED_AFTER_MS = 10 * 60 * 1000;
 
 export async function refreshNotes(owner: string): Promise<StoredNote[]> {
-  const notes = loadNotes(owner);
+  const notes = await loadNotes(owner);
   const alive: StoredNote[] = [];
 
   await Promise.all(
     notes.map(async (n) => {
       if (n.status === "queued") {
         if (await isGrafted(BigInt(n.commitment))) {
-          updateNote(owner, n.id, { status: "grafted" });
+          await updateNote(owner, n.id, { status: "grafted" });
           n.status = "grafted";
         } else if (!n.txHash && Date.now() - n.createdAt > ABANDONED_AFTER_MS) {
-          removeNote(owner, n.id);
+          await removeNote(owner, n.id);
           return;
         }
       }

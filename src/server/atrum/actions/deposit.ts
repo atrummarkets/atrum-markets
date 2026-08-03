@@ -55,7 +55,7 @@ export async function prepareDeposit(owner: string, units: number): Promise<Prep
   const provingMs = Date.now() - t0;
 
   const id = commitment.toString(16).slice(0, 8);
-  addNote({
+  await addNote({
     id,
     owner,
     commitment: commitment.toString(),
@@ -81,7 +81,7 @@ export async function prepareDeposit(owner: string, units: number): Promise<Prep
 }
 
 /** Record the hash once the user's wallet has actually landed the deposit. */
-export function confirmDeposit(owner: string, id: string, txHash: string): void {
-  getNote(owner, id);
-  updateNote(owner, id, { txHash });
+export async function confirmDeposit(owner: string, id: string, txHash: string): Promise<void> {
+  await getNote(owner, id);
+  await updateNote(owner, id, { txHash });
 }

@@ -1,6 +1,7 @@
 import { createPublicClient, createWalletClient, http, parseAbi, getAddress, defineChain } from "viem";
 import type { Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { join } from "node:path";
 
 function env(name: string): string {
   const v = process.env[name];
@@ -20,7 +21,15 @@ export const monadTestnet = defineChain({
 export const POOL_ADDRESS = getAddress(env("POOL_ADDRESS"));
 export const COLLATERAL_ADDRESS = getAddress(env("COLLATERAL_ADDRESS"));
 export const SEQUENCER_URL = env("SEQUENCER_URL");
-export const ATRUM_CORE_DIR = env("ATRUM_CORE_DIR");
+
+/**
+ * Where this app's compiled circuit artifacts live -- committed to this repo at
+ * circuits-build/ (see scripts/sync-circuits.mjs), not a sibling atrum-core checkout.
+ * A mismatch between these artifacts and the live pool's deployed verifiers fails as
+ * InvalidProof() with no other diagnostic, so keep circuits-build/ in sync with whichever
+ * atrum-core tree the pool was actually deployed from.
+ */
+export const CIRCUITS_DIR = process.env.CIRCUITS_DIR ?? join(process.cwd(), "circuits-build");
 
 /** The public RPC the BROWSER should use. Never the private one -- it carries an API key. */
 export const PUBLIC_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://testnet-rpc.monad.xyz";

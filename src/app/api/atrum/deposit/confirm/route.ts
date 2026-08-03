@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   try {
     const owner = await requireUser();
     const { id, txHash } = await req.json();
-    confirmDeposit(owner, String(id), String(txHash));
+    await confirmDeposit(owner, String(id), String(txHash));
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 400 });

@@ -28,7 +28,7 @@ export async function bet(
   marketId: number,
   side: "yes" | "no",
 ): Promise<BetResult> {
-  const spent = getNote(owner, noteId);
+  const spent = await getNote(owner, noteId);
   if (spent.outcome !== 0) throw new Error("that note is not unbet collateral");
   if (spent.status === "spent") throw new Error("that note is already spent");
   if (spent.status !== "grafted") throw new Error("that note is still queued -- wait for the next graft");
@@ -88,7 +88,7 @@ export async function bet(
   // below; if we crashed between a successful broadcast and this write, the secret would be
   // gone while the spend was already real.
   const id = positionCommitment.toString(16).slice(0, 8);
-  addNote({
+  await addNote({
     id,
     owner,
     commitment: positionCommitment.toString(),
@@ -112,13 +112,13 @@ export async function bet(
       [c1x, c1y, c2x, c2y],
     ]);
   } catch (error) {
-    removeNote(owner, id);
+    await removeNote(owner, id);
     throw error;
   }
 
-  updateNote(owner, id, { txHash: result.hash });
+  await updateNote(owner, id, { txHash: result.hash });
   // Mark the spent note spent only after confirmation.
-  updateNote(owner, spent.id, { status: "spent" });
+  await updateNote(owner, spent.id, { status: "spent" });
 
   return {
     id,
