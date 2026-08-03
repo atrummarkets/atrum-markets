@@ -1,7 +1,6 @@
 /**
  * Atrum product UI design tokens.
  * Ported from anonymity-set-interface-design/project/Atrum Market.dc.html
- * See ATRUM-UI-PROMPT.md for the rationale behind each decision.
  */
 
 export const color = {
@@ -36,11 +35,9 @@ export const motion = {
   event: "900ms cubic-bezier(0.16,1,0.30,1)", // reserved for resolution/seal — spend rarely
 } as const;
 
-/** The floor below which the house declines the bet. Not a UI constant — a protocol rule. */
-export const ANONYMITY_FLOOR = 12;
-/** Notes are grafted into the tree in batches of this size. */
-export const GRAFT_BATCH_SIZE = 64;
-/** Every action declares the same gas, regardless of what it does. */
-export const DECLARED_GAS_LIMIT = "2,500,000";
-/** Fixed bet denominations. An unusual amount is a name tag. */
-export const CHIP_DENOMINATIONS = [5, 25, 100, 500] as const;
+/**
+ * The anonymity floor and the denomination ladder are NOT UI constants -- they are on-chain
+ * protocol values (`ShieldedPool.minAnonymitySet`, `Denominations.sol`) that differ per
+ * deployment. They are read live from /api/atrum/config; hardcoding them here is how the UI
+ * ends up confidently stating a number the contract disagrees with.
+ */
