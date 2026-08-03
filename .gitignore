@@ -37,6 +37,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local demo note store (server-side, single shared wallet)
+/.data
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# committee key: read from ATRUM_CORE_DIR at runtime, never copied here.
+# atrum-core gitignores it too -- a second home is a second thing to drift.
+src/server/atrum/committee-key.json

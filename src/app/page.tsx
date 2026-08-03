@@ -19,7 +19,8 @@ export default function Home() {
     >
       <BootOverlay />
 
-      <div style={{ textAlign: "center", maxWidth: 640, animation: "atrum-rise 900ms cubic-bezier(0.16,1,0.30,1)" }}>
+      {/* The doors opening are this page's one reveal — no second entrance animation stacked on top. */}
+      <div style={{ textAlign: "center", maxWidth: 640 }}>
         <div
           style={{
             fontFamily: font.wordmark,
@@ -50,7 +51,8 @@ export default function Home() {
           The odds are public. You are not.
         </p>
         <Link
-          href="/market"
+          href="/markets"
+          className="atrum-cta"
           style={{
             display: "inline-block",
             padding: "20px 40px",
@@ -65,6 +67,9 @@ export default function Home() {
         >
           Enter the room
         </Link>
+
+        {/* The table the light falls on. */}
+        <div style={{ width: 96, height: 1, background: color.hairlineStrong, margin: "96px auto 0" }} />
       </div>
     </div>
   );

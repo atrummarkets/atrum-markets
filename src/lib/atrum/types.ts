@@ -20,6 +20,8 @@ export interface Note {
   stateColor: string;
   actionColor: string;
   actionBorder: string;
+  /** Raw unit count, so an action handler doesn't have to re-parse the display string. */
+  units?: number;
 }
 
 export interface ProvingStep {
