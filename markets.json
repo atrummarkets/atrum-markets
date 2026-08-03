@@ -110,6 +110,66 @@
       "bettingCloseTime": 1785772524,
       "resolutionStartTime": 1785772824,
       "createdAt": 1785771624
+    },
+    {
+      "id": 47,
+      "question": "Will ETH be above $3,000 at 2026-08-03T17:46:49.000Z?",
+      "category": "Crypto",
+      "resolverType": "oracle",
+      "vault": "0x5d45d7694e2185C1b61e329A3a8C5d397a7572B5",
+      "resolver": "0xe906410566ad77B24335aB89587c5781a0bBBd92",
+      "bettingCloseTime": 1785778609,
+      "resolutionStartTime": 1785782869,
+      "createdAt": 1785775609,
+      "spec": {
+        "priceId": "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+        "threshold": "300000000000",
+        "thresholdExpo": -8,
+        "targetTime": 1785779209,
+        "windowSeconds": 3600,
+        "greaterThan": true
+      }
+    },
+    {
+      "id": 48,
+      "question": "Will ETH be above $1,870 at 2026-08-03T17:47:36.000Z?",
+      "category": "Crypto",
+      "resolverType": "oracle",
+      "vault": "0x74fD45c4ca1a75BCdeB60E6e186Ff326570e0e17",
+      "resolver": "0xe906410566ad77B24335aB89587c5781a0bBBd92",
+      "bettingCloseTime": 1785778656,
+      "resolutionStartTime": 1785782916,
+      "createdAt": 1785775656,
+      "spec": {
+        "priceId": "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+        "threshold": "187000000000",
+        "thresholdExpo": -8,
+        "targetTime": 1785779256,
+        "windowSeconds": 3600,
+        "greaterThan": true
+      }
+    },
+    {
+      "id": 49,
+      "question": "[DEMO] fast market",
+      "category": "Monad",
+      "resolverType": "manual",
+      "vault": "0x62F9271C91e69D938b3980f63F190bD1828976F5",
+      "resolver": "0x364EDC06254874e62FF4AD8fA4d9a45238cb5609",
+      "bettingCloseTime": 1785775994,
+      "resolutionStartTime": 1785776294,
+      "createdAt": 1785775694
+    },
+    {
+      "id": 50,
+      "question": "[DEMO] 15-minute market",
+      "category": "Monad",
+      "resolverType": "manual",
+      "vault": "0x6d182E8C2f0F5Ab5d66C188b404835dAd5E38205",
+      "resolver": "0x364EDC06254874e62FF4AD8fA4d9a45238cb5609",
+      "bettingCloseTime": 1785776697,
+      "resolutionStartTime": 1785776997,
+      "createdAt": 1785775797
     }
   ]
 }
