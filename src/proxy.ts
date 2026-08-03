@@ -1,36 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifyGateToken } from "@/server/atrum/gate";
 
 /**
- * Testnet access gate. Runs ahead of every matched request (Node.js runtime by
- * default in Next 16, which is why gate.ts's verifyGateToken can use node:crypto
- * directly instead of an edge-compatible subset).
+ * Testnet access gate -- DISABLED. The site is public.
  *
- * Deliberately does NOT cover atrum-core's sequencer, which the browser calls
- * directly for /path and /relay -- accepted gap, see the plan doc. This only
- * protects atrum-markets itself: every page and every /api/atrum/* route
- * except the two exempted below.
+ * The gate (access-code check via atrum-landing, GATE_SECRET-signed cookie) is still in
+ * src/server/atrum/gate.ts and src/app/api/atrum/gate/route.ts if it's ever wanted back --
+ * this just stops proxy.ts from enforcing it. Re-enable by restoring the matcher below and
+ * the check against verifyGateToken.
  */
-export function proxy(request: NextRequest) {
-  const token = request.cookies.get("atrum_gate")?.value;
-  if (token && verifyGateToken(token)) {
-    return NextResponse.next();
-  }
-
-  const { pathname } = request.nextUrl;
-
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "access code required" }, { status: 401 });
-  }
-
-  const url = new URL("/enter", request.url);
-  url.searchParams.set("next", pathname);
-  return NextResponse.redirect(url);
+export function proxy(_request: NextRequest) {
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|enter|api/atrum/gate|favicon.ico|apple-touch-icon.png|favicon-16x16.png|favicon-32x32.png|icon-512.png).*)",
-  ],
+  matcher: [],
 };

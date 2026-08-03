@@ -77,6 +77,39 @@
         "windowSeconds": 300,
         "greaterThan": true
       }
+    },
+    {
+      "id": 44,
+      "question": "[TEST] 10-minute demo market",
+      "category": "Monad",
+      "resolverType": "manual",
+      "vault": "0x1d898a0D618924a88DEA6b3d8e4be4d7009f5048",
+      "resolver": "0x364EDC06254874e62FF4AD8fA4d9a45238cb5609",
+      "bettingCloseTime": 1785770958,
+      "resolutionStartTime": 1785771258,
+      "createdAt": 1785770658
+    },
+    {
+      "id": 45,
+      "question": "[DEMO] 10-minute market",
+      "category": "Monad",
+      "resolverType": "manual",
+      "vault": "0xe7a97b561de72cEBeEC03042fE5D291b0e77fd26",
+      "resolver": "0x364EDC06254874e62FF4AD8fA4d9a45238cb5609",
+      "bettingCloseTime": 1785771668,
+      "resolutionStartTime": 1785771968,
+      "createdAt": 1785771368
+    },
+    {
+      "id": 46,
+      "question": "[DEMO] bet-storm market",
+      "category": "Monad",
+      "resolverType": "manual",
+      "vault": "0x642aa24C7F02881ED19bE36734f2Da500Cb9B0A4",
+      "resolver": "0x364EDC06254874e62FF4AD8fA4d9a45238cb5609",
+      "bettingCloseTime": 1785772524,
+      "resolutionStartTime": 1785772824,
+      "createdAt": 1785771624
     }
   ]
 }

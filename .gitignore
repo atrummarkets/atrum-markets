@@ -45,3 +45,5 @@ next-env.d.ts
 # This local-dev fallback path is never committed -- atrum-core gitignores its copy too,
 # a second home is a second thing to drift.
 circuits-build/committee-key.json
+scripts/bet-storm-keys.json
+/.data
