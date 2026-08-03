@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 import { color, font, motion } from "@/lib/atrum/theme";
 import { useMarket } from "@/lib/atrum/marketContext";
 import { useWallet } from "@/lib/atrum/wallet";
+import Logo from "./Logo";
 
 const NAV = [
+  { href: "/start", label: "Start" },
   { href: "/markets", label: "Markets" },
   { href: "/notes", label: "Notes" },
   { href: "/boundary", label: "Boundary" },
@@ -48,9 +50,7 @@ export default function Header() {
         borderBottom: `1px solid ${color.hairline}`,
       }}
     >
-      <Link href="/markets" style={{ fontFamily: font.wordmark, fontWeight: 700, fontSize: 15, letterSpacing: "0.16em", color: color.ivory, textDecoration: "none" }}>
-        ATRUM
-      </Link>
+      <Logo href="/markets" size={22} />
 
       <nav style={{ display: "flex", gap: 32 }}>
         {NAV.map((item) => (

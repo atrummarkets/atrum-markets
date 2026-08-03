@@ -5,6 +5,7 @@ import { MarketProvider } from "@/lib/atrum/marketContext";
 import Header from "@/components/atrum/Header";
 import ActivityOverlay from "@/components/atrum/ActivityOverlay";
 import ReceiptOverlay from "@/components/atrum/ReceiptOverlay";
+import OnboardingBanner from "@/components/atrum/onboarding/OnboardingBanner";
 
 export const metadata: Metadata = {
   title: "Atrum — Markets",
@@ -28,6 +29,7 @@ export default function ProductLayout({ children }: { children: React.ReactNode 
           }}
         >
           <Header />
+          <OnboardingBanner />
           {children}
         </div>
         <ActivityOverlay />

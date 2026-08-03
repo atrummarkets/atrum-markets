@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BootOverlay from "@/components/BootOverlay";
+import Logo from "@/components/atrum/Logo";
 import { color, font } from "@/lib/atrum/theme";
 
 export default function Home() {
@@ -21,18 +22,8 @@ export default function Home() {
 
       {/* The doors opening are this page's one reveal — no second entrance animation stacked on top. */}
       <div style={{ textAlign: "center", maxWidth: 640 }}>
-        <div
-          style={{
-            fontFamily: font.wordmark,
-            fontWeight: 700,
-            fontSize: 13,
-            letterSpacing: "0.16em",
-            color: color.ash,
-            marginBottom: 32,
-            textTransform: "uppercase",
-          }}
-        >
-          Atrum
+        <div style={{ marginBottom: 32 }}>
+          <Logo size={30} tint={color.ash} />
         </div>
         <h1
           style={{
@@ -51,7 +42,7 @@ export default function Home() {
           The odds are public. You are not.
         </p>
         <Link
-          href="/markets"
+          href="/start"
           className="atrum-cta"
           style={{
             display: "inline-block",
