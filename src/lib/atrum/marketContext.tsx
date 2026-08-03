@@ -246,6 +246,11 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             BigInt(prepared.commitment),
             BigInt(prepared.units),
           ],
+          // Real testnet deposit measures ~1,816,000 gas (HANDOFF.md), 30-55% over any local
+          // or wallet-estimated figure -- calldata and cold-storage costs a naive estimate
+          // misses. Wallet auto-estimation undershot this to 1,000,000 and reverted out of gas
+          // in practice; declaring it explicitly, with headroom, is the fix.
+          gas: 2_200_000n,
           chain: null,
           account: address,
         });
