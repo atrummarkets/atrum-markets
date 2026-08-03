@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Syne, Barlow_Condensed, Manrope, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const syne = Syne({
@@ -45,7 +46,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       lang="en"
       className={`${syne.variable} ${barlowCondensed.variable} ${manrope.variable} ${geistMono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
