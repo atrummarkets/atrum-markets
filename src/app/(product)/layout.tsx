@@ -3,6 +3,7 @@ import { color, font } from "@/lib/atrum/theme";
 import { WalletProvider } from "@/lib/atrum/wallet";
 import { MarketProvider } from "@/lib/atrum/marketContext";
 import Header from "@/components/atrum/Header";
+import Footer from "@/components/atrum/Footer";
 import ActivityOverlay from "@/components/atrum/ActivityOverlay";
 import ReceiptOverlay from "@/components/atrum/ReceiptOverlay";
 import OnboardingBanner from "@/components/atrum/onboarding/OnboardingBanner";
@@ -31,6 +32,7 @@ export default function ProductLayout({ children }: { children: React.ReactNode 
           <Header />
           <OnboardingBanner />
           {children}
+          <Footer />
         </div>
         <ActivityOverlay />
         <ReceiptOverlay />
