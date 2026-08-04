@@ -65,7 +65,7 @@ export default function BetTicket({
           You will sign a message so we can hand back your notes. It is not a transaction and costs nothing.
         </p>
         <button
-          onClick={connect}
+          onClick={() => connect()}
           disabled={connecting}
           style={{ width: "100%", padding: 20, border: 0, background: color.ivory, color: color.void, borderRadius: 2, cursor: "pointer", fontFamily: font.display, fontSize: 20, letterSpacing: "0.14em" }}
         >

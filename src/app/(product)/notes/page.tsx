@@ -86,7 +86,7 @@ export default function NotesPage() {
           no gas.
         </p>
         <button
-          onClick={connect}
+          onClick={() => connect()}
           disabled={connecting}
           style={{ padding: "18px 32px", border: 0, background: color.ivory, color: color.void, borderRadius: 2, cursor: "pointer", fontFamily: font.display, fontSize: 20, letterSpacing: "0.14em" }}
         >
