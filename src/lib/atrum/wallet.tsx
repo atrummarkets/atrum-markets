@@ -86,7 +86,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [discovered, setDiscovered] = useState<Eip6963ProviderDetail[]>([]);
   // Lazy initializers, not effect-driven state: both values are readable synchronously on the
   // client at mount time, so deriving them in an effect would just cost an extra render.
-  const [activeUuid, setActiveUuid] = useState<string | null>(() =>
+  //
+  // Persisted by `rdns` ("io.metamask"), never `uuid`: EIP-6963 uuids are explicitly session-
+  // scoped -- most wallets mint a fresh one on every announce specifically so it can't be used
+  // to correlate a user across page loads. Storing a uuid here would mean it never matches
+  // again after a reload, leaving `activeProvider` permanently unresolved whenever more than
+  // one wallet is installed (the exact "stuck on reload" bug this replaced).
+  const [activeRdns, setActiveRdns] = useState<string | null>(() =>
     typeof window !== "undefined" ? localStorage.getItem(PROVIDER_KEY) : null
   );
   const [legacyProvider] = useState<Eip1193 | null>(() =>
@@ -113,20 +119,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const hasProvider = wallets.length > 0 || !!legacyProvider;
 
   // The provider a connected/connecting session actually talks to: whichever wallet the user
-  // picked (persisted across reloads by uuid), or the sole legacy `window.ethereum` when no
-  // EIP-6963 wallet announced itself at all.
+  // picked last time (matched back by its stable rdns), the sole EIP-6963 wallet when there is
+  // only one, or the legacy `window.ethereum` slot when no EIP-6963 wallet announced at all.
   const activeProvider: Eip1193 | null =
-    discovered.find((d) => d.info.uuid === activeUuid)?.provider ?? (wallets.length === 0 ? legacyProvider : null);
+    discovered.find((d) => d.info.rdns === activeRdns)?.provider ??
+    (wallets.length === 1 ? discovered[0].provider : null) ??
+    (wallets.length === 0 ? legacyProvider : null);
 
   const resolveProvider = useCallback(
     (uuid?: string): Eip1193 | null => {
       if (uuid) return discovered.find((d) => d.info.uuid === uuid)?.provider ?? null;
-      if (activeProvider) return activeProvider;
-      if (wallets.length === 0) return legacyProvider;
-      if (wallets.length === 1) return discovered[0].provider;
-      return null; // more than one wallet installed -- caller must pass a uuid
+      return activeProvider; // null here means "ambiguous -- caller must pass a uuid"
     },
-    [discovered, wallets.length, legacyProvider, activeProvider]
+    [discovered, activeProvider]
   );
 
   // Restore on mount. The session cookie survives a reload but React state does not, so
@@ -219,10 +224,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           ? new Error("Multiple wallets installed -- pick one.")
           : new Error("No wallet found. Install MetaMask or another injected wallet.");
       }
-      const resolvedUuid = uuid ?? (wallets.length === 1 ? discovered[0]?.info.uuid : undefined);
-      if (resolvedUuid) {
-        setActiveUuid(resolvedUuid);
-        localStorage.setItem(PROVIDER_KEY, resolvedUuid);
+      const rdns = uuid
+        ? discovered.find((d) => d.info.uuid === uuid)?.info.rdns
+        : (wallets.length === 1 ? discovered[0]?.info.rdns : undefined);
+      if (rdns) {
+        setActiveRdns(rdns);
+        localStorage.setItem(PROVIDER_KEY, rdns);
       }
 
       const accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
