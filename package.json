@@ -10,8 +10,14 @@
     "db:migrate": "node --env-file-if-exists=.env.local db/migrate.mjs"
   },
   "dependencies": {
+    "@reown/appkit": "^1.8.23",
+    "@reown/appkit-adapter-wagmi": "^1.8.23",
+    "@tanstack/react-query": "^5.101.4",
     "@vercel/analytics": "^2.0.1",
-    "@walletconnect/ethereum-provider": "^2.23.10",
+    "@wagmi/core": "^3.6.4",
+    "@x402/core": "^2.20.0",
+    "@x402/evm": "^2.20.0",
+    "@x402/svm": "^2.20.0",
     "circomlibjs": "^0.1.7",
     "js-sha3": "^0.12.0",
     "next": "16.2.12",
@@ -19,7 +25,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "snarkjs": "^0.7.6",
-    "viem": "^2.55.10"
+    "viem": "^2.55.10",
+    "wagmi": "^3.7.6"
   },
   "devDependencies": {
     "@types/node": "^20",

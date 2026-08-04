@@ -174,7 +174,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         if (!address) throw new Error("connect your wallet first");
         step(`Minting ${units} test ${config.token.symbol}`);
         const raw = BigInt(units) * BigInt(config.poolState.denomination);
-        const hash = await walletClient().writeContract({
+        const hash = await (await walletClient()).writeContract({
           address: config.collateral,
           abi: ERC20_ABI,
           functionName: "mint",
@@ -222,7 +222,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
 
         if (allowance < raw) {
           step("Approve the pool to move your collateral");
-          const approveHash = await walletClient().writeContract({
+          const approveHash = await (await walletClient()).writeContract({
             address: config.collateral,
             abi: ERC20_ABI,
             functionName: "approve",
@@ -235,7 +235,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         }
 
         step("Confirm the deposit in your wallet");
-        const hash = await walletClient().writeContract({
+        const hash = await (await walletClient()).writeContract({
           address: config.pool,
           abi: DEPOSIT_ABI,
           functionName: "deposit",

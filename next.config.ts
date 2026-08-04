@@ -1,6 +1,12 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    // Without this Turbopack walks up to the parent Projects/ directory (it has a lockfile of
+    // its own) and infers the wrong workspace root.
+    root: path.resolve(__dirname),
+  },
   /**
    * The proving/circuit-stats routes read circuits-build/*.zkey|.wasm|.r1cs via a
    * runtime-joined fs path (see src/server/atrum/{prove,circuits}.ts), not a static
