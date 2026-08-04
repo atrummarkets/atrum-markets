@@ -11,9 +11,11 @@ import {
   type WalletClient,
   type PublicClient,
 } from "viem";
+import type EthereumProvider from "@walletconnect/ethereum-provider";
 
 const CHAIN_ID = 10143;
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://testnet-rpc.monad.xyz";
+const PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 
 export const monadTestnet = defineChain({
   id: CHAIN_ID,
@@ -23,34 +25,41 @@ export const monadTestnet = defineChain({
   blockExplorers: { default: { name: "MonadExplorer", url: "https://testnet.monadexplorer.com" } },
 });
 
-interface Eip1193 {
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
-  on?(event: string, handler: (...args: never[]) => void): void;
-  removeListener?(event: string, handler: (...args: never[]) => void): void;
-}
+type WcProvider = Awaited<ReturnType<typeof EthereumProvider.init>>;
 
-declare global {
-  interface Window {
-    ethereum?: Eip1193;
+/**
+ * One WalletConnect provider for the whole app.
+ *
+ * Deliberately NOT the injected `window.ethereum`: that slot is a single global every wallet
+ * extension races to claim, so whichever one wins silently decides which wallet the user is
+ * allowed to use, and stale state from a previous connection gets attributed to whatever
+ * claims the slot next. WalletConnect owns wallet selection and session lifetime itself, so
+ * that whole class of bug does not exist here.
+ *
+ * The promise is memoised rather than the resolved provider: `init` is async and several
+ * callers can race it on first paint, and initialising twice would open two relay sessions.
+ */
+let providerPromise: Promise<WcProvider> | null = null;
+
+function getProvider(): Promise<WcProvider> {
+  if (!providerPromise) {
+    providerPromise = import("@walletconnect/ethereum-provider").then(({ default: EthereumProvider }) =>
+      EthereumProvider.init({
+        projectId: PROJECT_ID,
+        chains: [CHAIN_ID],
+        rpcMap: { [CHAIN_ID]: RPC_URL },
+        showQrModal: true,
+        metadata: {
+          name: "Atrum",
+          description: "Private prediction markets. The odds are public. You are not.",
+          url: "https://markets.atrum.fun",
+          icons: ["https://markets.atrum.fun/icon-512.png"],
+        },
+      }),
+    );
   }
+  return providerPromise;
 }
-
-/** EIP-6963: each installed wallet extension announces itself instead of racing to claim
- *  `window.ethereum`. This is what lets MetaMask show up as a real, named option instead of
- *  being silently shadowed by whichever wallet happened to inject last. */
-export interface WalletOption {
-  uuid: string;
-  name: string;
-  icon: string;
-  rdns: string;
-}
-
-interface Eip6963ProviderDetail {
-  info: WalletOption;
-  provider: Eip1193;
-}
-
-const PROVIDER_KEY = "atrum:wallet-provider-uuid";
 
 interface WalletValue {
   address: Address | null;
@@ -59,14 +68,7 @@ interface WalletValue {
   chainOk: boolean;
   connecting: boolean;
   error: string | null;
-  hasProvider: boolean;
-  /** Every wallet extension that announced itself via EIP-6963, for a picker UI. Empty on
-   *  browsers/wallets that only support the legacy single `window.ethereum` slot. */
-  wallets: WalletOption[];
-  /** Pass a `WalletOption.uuid` from `wallets` to connect a specific wallet. Omit it only when
-   *  `wallets` has at most one entry -- with more than one installed, the caller must let the
-   *  user pick rather than guessing. */
-  connect: (uuid?: string) => Promise<void>;
+  connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   switchChain: () => Promise<void>;
   walletClient: () => WalletClient;
@@ -83,63 +85,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [chainId, setChainId] = useState<number | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discovered, setDiscovered] = useState<Eip6963ProviderDetail[]>([]);
-  // Lazy initializers, not effect-driven state: both values are readable synchronously on the
-  // client at mount time, so deriving them in an effect would just cost an extra render.
-  //
-  // Persisted by `rdns` ("io.metamask"), never `uuid`: EIP-6963 uuids are explicitly session-
-  // scoped -- most wallets mint a fresh one on every announce specifically so it can't be used
-  // to correlate a user across page loads. Storing a uuid here would mean it never matches
-  // again after a reload, leaving `activeProvider` permanently unresolved whenever more than
-  // one wallet is installed (the exact "stuck on reload" bug this replaced).
-  const [activeRdns, setActiveRdns] = useState<string | null>(() =>
-    typeof window !== "undefined" ? localStorage.getItem(PROVIDER_KEY) : null
-  );
-  const [legacyProvider] = useState<Eip1193 | null>(() =>
-    typeof window !== "undefined" ? (window.ethereum ?? null) : null
-  );
+  const [provider, setProvider] = useState<WcProvider | null>(null);
 
-  // Every installed wallet extension gets a chance to announce itself (EIP-6963) instead of
-  // all of them fighting over the single `window.ethereum` slot. `requestProvider` is a plain
-  // broadcast -- wallets that support the standard reply with their own `announceProvider`
-  // event, which can arrive after this effect runs, so the listener stays mounted for the
-  // lifetime of the app rather than firing once.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onAnnounce = (event: Event) => {
-      const detail = (event as CustomEvent<Eip6963ProviderDetail>).detail;
-      setDiscovered((prev) => (prev.some((p) => p.info.uuid === detail.info.uuid) ? prev : [...prev, detail]));
-    };
-    window.addEventListener("eip6963:announceProvider", onAnnounce as EventListener);
-    window.dispatchEvent(new Event("eip6963:requestProvider"));
-    return () => window.removeEventListener("eip6963:announceProvider", onAnnounce as EventListener);
-  }, []);
-
-  const wallets: WalletOption[] = discovered.map((d) => d.info);
-  const hasProvider = wallets.length > 0 || !!legacyProvider;
-
-  // The provider a connected/connecting session actually talks to: whichever wallet the user
-  // picked last time (matched back by its stable rdns), the sole EIP-6963 wallet when there is
-  // only one, or the legacy `window.ethereum` slot when no EIP-6963 wallet announced at all.
-  const activeProvider: Eip1193 | null =
-    discovered.find((d) => d.info.rdns === activeRdns)?.provider ??
-    (wallets.length === 1 ? discovered[0].provider : null) ??
-    (wallets.length === 0 ? legacyProvider : null);
-
-  const resolveProvider = useCallback(
-    (uuid?: string): Eip1193 | null => {
-      if (uuid) return discovered.find((d) => d.info.uuid === uuid)?.provider ?? null;
-      return activeProvider; // null here means "ambiguous -- caller must pass a uuid"
-    },
-    [discovered, activeProvider]
-  );
-
-  // Restore on mount. The session cookie survives a reload but React state does not, so
-  // without this a refresh shows a signed-in user with no address and no chain -- balance
-  // reads as "—" and the header demands a chain switch that already happened.
-  //
-  // `eth_accounts` (not `eth_requestAccounts`) is the silent form: it returns the already
-  // authorised accounts and never opens a wallet prompt.
+  // The server session cookie survives a reload but React state does not, so without this a
+  // refresh shows a signed-in user with no address and no chain -- balance reads as "—" and the
+  // header demands a chain switch that already happened.
   useEffect(() => {
     fetch("/api/atrum/auth/session")
       .then((r) => r.json())
@@ -147,29 +97,35 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, []);
 
+  // Resolve the provider and adopt whatever session WalletConnect restored on its own. `init`
+  // reloads a live session from its own storage, so `accounts` is already populated here when
+  // one exists -- there is no silent-probe request to make, and nothing to reconcile against a
+  // wallet that merely happens to be installed.
   useEffect(() => {
-    const eth = resolveProvider();
-    if (!eth) return;
-    (async () => {
-      try {
-        const accounts = (await eth.request({ method: "eth_accounts" })) as string[];
-        if (accounts?.[0]) setAddress(accounts[0] as Address);
-        const id = (await eth.request({ method: "eth_chainId" })) as string;
-        setChainId(parseInt(id, 16));
-      } catch {
-        /* a locked or absent wallet is not an error here -- the user just is not connected */
-      }
-    })();
-    // Only re-run when the resolved provider identity actually changes, not on every render
-    // resolveProvider is recreated -- eslint-disable would hide real dependency changes here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProvider, legacyProvider, wallets.length]);
+    let cancelled = false;
+    getProvider()
+      .then((p) => {
+        if (cancelled) return;
+        setProvider(p);
+        if (p.accounts?.[0]) {
+          setAddress(p.accounts[0] as Address);
+          setChainId(p.chainId);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError((e as Error).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // A wallet can change account or network underneath us. Without these listeners the UI keeps
-  // showing a stale address and every action fails against the wrong chain.
+  // A wallet can change account, change network, or end the session from its own side. Without
+  // these the UI keeps showing a stale address and every action fails against the wrong chain
+  // or a dead session.
   useEffect(() => {
-    const eth = resolveProvider();
-    if (!eth?.on) return;
+    if (!provider) return;
+
     const onAccounts = (accounts: string[]) => {
       const next = (accounts?.[0] as Address) ?? null;
       setAddress(next);
@@ -178,19 +134,27 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setSession((s) => (s && next && s.toLowerCase() === next.toLowerCase() ? s : null));
       if (!next) fetch("/api/atrum/auth/signout", { method: "POST" }).catch(() => {});
     };
-    const onChain = (hex: string) => setChainId(parseInt(hex, 16));
-    eth.on("accountsChanged", onAccounts as never);
-    eth.on("chainChanged", onChain as never);
-    return () => {
-      eth.removeListener?.("accountsChanged", onAccounts as never);
-      eth.removeListener?.("chainChanged", onChain as never);
+    const onChain = (id: string | number) =>
+      setChainId(typeof id === "string" ? parseInt(id, 16) : id);
+    const onDisconnect = () => {
+      setAddress(null);
+      setChainId(null);
+      setSession(null);
+      fetch("/api/atrum/auth/signout", { method: "POST" }).catch(() => {});
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProvider, legacyProvider, wallets.length]);
+
+    provider.on("accountsChanged", onAccounts);
+    provider.on("chainChanged", onChain);
+    provider.on("disconnect", onDisconnect);
+    return () => {
+      provider.removeListener("accountsChanged", onAccounts);
+      provider.removeListener("chainChanged", onChain);
+      provider.removeListener("disconnect", onDisconnect);
+    };
+  }, [provider]);
 
   const switchChain = useCallback(async () => {
-    const eth = resolveProvider();
-    if (!eth) throw new Error("no wallet found");
+    const eth = await getProvider();
     const hex = `0x${CHAIN_ID.toString(16)}`;
     try {
       await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hex }] });
@@ -212,34 +176,25 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       });
     }
     setChainId(CHAIN_ID);
-  }, [resolveProvider]);
+  }, []);
 
-  const connect = useCallback(async (uuid?: string) => {
+  const connect = useCallback(async () => {
     setError(null);
     setConnecting(true);
     try {
-      const eth = resolveProvider(uuid);
-      if (!eth) {
-        throw wallets.length > 1
-          ? new Error("Multiple wallets installed -- pick one.")
-          : new Error("No wallet found. Install MetaMask or another injected wallet.");
-      }
-      const rdns = uuid
-        ? discovered.find((d) => d.info.uuid === uuid)?.info.rdns
-        : (wallets.length === 1 ? discovered[0]?.info.rdns : undefined);
-      if (rdns) {
-        setActiveRdns(rdns);
-        localStorage.setItem(PROVIDER_KEY, rdns);
-      }
+      if (!PROJECT_ID) throw new Error("WalletConnect is not configured (missing project id).");
+      const eth = await getProvider();
 
-      const accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
-      const account = accounts[0] as Address;
+      // Opening the modal on an already-live session would ask the user to pair a second time
+      // for a wallet they are already connected to.
+      if (!eth.accounts?.length) await eth.connect();
+
+      const account = eth.accounts?.[0] as Address | undefined;
       if (!account) throw new Error("no account returned");
       setAddress(account);
 
-      const current = parseInt((await eth.request({ method: "eth_chainId" })) as string, 16);
-      setChainId(current);
-      if (current !== CHAIN_ID) await switchChain();
+      setChainId(eth.chainId);
+      if (eth.chainId !== CHAIN_ID) await switchChain();
 
       // Prove control of the address to the server, so it will hand back this address's notes.
       const { nonce, message } = await (await fetch("/api/atrum/auth/nonce")).json();
@@ -262,20 +217,25 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } finally {
       setConnecting(false);
     }
-  }, [switchChain, resolveProvider, wallets.length, discovered]);
+  }, [switchChain]);
 
+  // Ends the WalletConnect session as well as the server one. Dropping only the server session
+  // would leave the wallet still paired, so the next "connect" would silently reuse the old
+  // pairing instead of letting the user choose a wallet.
   const disconnect = useCallback(async () => {
     await fetch("/api/atrum/auth/signout", { method: "POST" }).catch(() => {});
     setSession(null);
     setAddress(null);
+    setChainId(null);
+    const eth = await getProvider().catch(() => null);
+    if (eth?.session) await eth.disconnect().catch(() => {});
   }, []);
 
   const walletClient = useCallback((): WalletClient => {
-    const eth = resolveProvider();
-    if (!eth) throw new Error("no wallet found");
+    if (!provider) throw new Error("wallet not ready");
     if (!address) throw new Error("wallet not connected");
-    return createWalletClient({ chain: monadTestnet, transport: custom(eth), account: address });
-  }, [address, resolveProvider]);
+    return createWalletClient({ chain: monadTestnet, transport: custom(provider), account: address });
+  }, [address, provider]);
 
   const value: WalletValue = {
     address,
@@ -283,8 +243,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     chainOk: chainId === CHAIN_ID,
     connecting,
     error,
-    hasProvider,
-    wallets,
     connect,
     disconnect,
     switchChain,

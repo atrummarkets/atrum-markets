@@ -11,7 +11,6 @@ import { useOnboardingStep, type OnboardingStepKind } from "@/lib/atrum/onboardi
  * actionable.
  */
 const ORDER: OnboardingStepKind[] = [
-  "install-wallet",
   "connect",
   "switch-chain",
   "prerequisites",

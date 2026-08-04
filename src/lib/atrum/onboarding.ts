@@ -10,7 +10,6 @@ import { useMarket } from "./marketContext";
  * before."
  */
 export type OnboardingStepKind =
-  | "install-wallet"
   | "connect"
   | "switch-chain"
   | "prerequisites"
@@ -32,17 +31,8 @@ export interface OnboardingStep {
 }
 
 export function useOnboardingStep(): OnboardingStep {
-  const { hasProvider, session, chainOk, connect, switchChain, connecting } = useWallet();
+  const { session, chainOk, connect, switchChain, connecting } = useWallet();
   const { config, pool, notes, markets, walletUnits } = useMarket();
-
-  if (!hasProvider) {
-    return {
-      kind: "install-wallet",
-      title: "Install a wallet",
-      detail: "Atrum needs an injected wallet (MetaMask or similar) to sign deposits and prove you own your notes.",
-      link: { label: "Install MetaMask", href: "https://metamask.io/download/" },
-    };
-  }
 
   if (!session) {
     return {
