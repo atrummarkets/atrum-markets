@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { color, font, motion } from "@/lib/atrum/theme";
 import { formatCountdown } from "@/lib/atrum/format";
 import { useMarket } from "@/lib/atrum/marketContext";
-import type { LiveMarket } from "@/lib/atrum/api";
+import type { LiveMarket, PoolState } from "@/lib/atrum/api";
+import Shimmer from "@/components/atrum/ui/motion/Shimmer";
+import Marquee from "@/components/atrum/ui/motion/Marquee";
 
 function PhaseTag({ m }: { m: LiveMarket }) {
   const map = {
@@ -93,6 +95,33 @@ function Card({ m, now }: { m: LiveMarket; now: number }) {
   );
 }
 
+/** Real, aggregate, anonymized pool facts only -- never a specific bet, side, or amount. This
+ * is activity-as-trust-signal, not a logo strip: it's also a live illustration of the
+ * anonymity set actually growing. */
+function poolMarqueeItems(pool: PoolState): string[] {
+  return [
+    `${pool.totalDeposits} notes in the shared pool`,
+    `${pool.batchCount} batch${pool.batchCount === 1 ? "" : "es"} grafted`,
+    `${pool.queuedCount} queued for the next graft`,
+    `${pool.minAnonymitySet}-note floor per market`,
+  ];
+}
+
+function CardSkeleton() {
+  return (
+    <Shimmer className="flex flex-col justify-between gap-8 p-8" style={{ minHeight: 260 }}>
+      <div className="flex flex-col gap-5">
+        <div className="h-3 w-24 bg-hairline" />
+        <div className="h-6 w-4/5 bg-hairline" />
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="h-9 w-32 bg-hairline" />
+        <div className="h-1.5 w-full bg-hairline" />
+      </div>
+    </Shimmer>
+  );
+}
+
 export default function MarketsPage() {
   const { markets, pool, error } = useMarket();
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -116,18 +145,20 @@ export default function MarketsPage() {
       >
         Markets
       </h1>
-      <p style={{ margin: "0 0 12px", fontSize: 19, color: color.smoke, maxWidth: "62ch" }}>
+      <p style={{ margin: "0 0 32px", fontSize: 19, color: color.smoke, maxWidth: "62ch" }}>
         The odds are public. Your position is not. Every stake is encrypted on chain and only ever added to a
         total — nobody, including us, sees what you staked until the market settles.
       </p>
+
       {pool && (
-        <p style={{ margin: "0 0 56px", fontSize: 15, color: color.ash }}>
-          <span style={{ fontFamily: font.mono, color: color.pewter }}>{pool.totalDeposits}</span> notes in the
-          shared pool ·{" "}
-          <span style={{ fontFamily: font.mono, color: color.pewter }}>{pool.batchCount}</span> batches grafted ·{" "}
-          <span style={{ fontFamily: font.mono, color: color.pewter }}>{pool.queuedCount}</span> waiting for the
-          next graft
-        </p>
+        <Marquee
+          items={poolMarqueeItems(pool).map((t) => (
+            <span key={t} style={{ fontFamily: font.mono, fontSize: 13, color: color.ash }}>
+              {t}
+            </span>
+          ))}
+          className="mb-14 border-y border-hairline py-3"
+        />
       )}
 
       {error && (
@@ -137,8 +168,10 @@ export default function MarketsPage() {
       )}
 
       {markets.length === 0 ? (
-        <div style={{ padding: 64, border: `1px solid ${color.hairline}`, color: color.ash, textAlign: "center" }}>
-          Loading markets from the chain…
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(360px,1fr))", gap: 20 }}>
+          {Array.from({ length: 6 }, (_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(360px,1fr))", gap: 20 }}>

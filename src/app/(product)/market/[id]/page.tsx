@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { color, font, motion } from "@/lib/atrum/theme";
+import { color, font } from "@/lib/atrum/theme";
 import { formatCountdown, formatBytes, addressUrl } from "@/lib/atrum/format";
 import { useMarket } from "@/lib/atrum/marketContext";
 import { useWallet } from "@/lib/atrum/wallet";
@@ -10,6 +10,8 @@ import OddsBoard from "@/components/atrum/market/OddsBoard";
 import AnonymityPanel from "@/components/atrum/market/AnonymityPanel";
 import BetTicket from "@/components/atrum/market/BetTicket";
 import AdminPanel from "@/components/atrum/market/AdminPanel";
+import Detail from "@/components/atrum/ui/Detail";
+import TextReveal from "@/components/atrum/ui/motion/TextReveal";
 
 export default function MarketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -90,9 +92,11 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 {market.settled ? "Settled" : "Resolved"}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 28, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: font.display, fontSize: "clamp(44px,7vw,96px)", lineHeight: 0.86, color: color.ivory }}>
-                  {market.outcome}
-                </span>
+                <TextReveal
+                  text={market.outcome}
+                  className="font-display text-[clamp(44px,7vw,96px)] leading-[0.86]"
+                  staggerMs={80}
+                />
                 <span style={{ fontSize: 18, color: color.pewter, maxWidth: "36ch" }}>
                   {market.settled
                     ? `Totals decrypted and published on chain under a Chaum-Pedersen proof: YES ${market.yesUnits}, NO ${market.noUnits}.`
@@ -135,37 +139,40 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
         {pool && <AnonymityPanel pool={pool} />}
 
         {config && (
-          <div
-            style={{
-              marginTop: 56,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))",
-              gap: 1,
-              background: color.hairline,
-              border: `1px solid ${color.hairline}`,
-            }}
-          >
-            {[
-              {
-                t: "The relayer",
-                b: `Your bet is submitted by a relayer, so your address never appears beside it on chain. The relayer knows it was you — trust is relocated, not removed.`,
-              },
-              {
-                t: "The proof",
-                b: `A bet proves ${config.circuits.bet.constraints.toLocaleString()} constraints against a ${formatBytes(config.circuits.bet.zkeyBytes)} proving key. It runs on this server, which therefore sees your note secrets — the production design proves in your browser instead.`,
-              },
-              {
-                t: "The payout",
-                b: `Redeeming pays into a shielded note; no collateral moves and nothing is published. Withdrawing is a separate, public step, taken whenever you like.`,
-              },
-            ].map((tile) => (
-              <div key={tile.t} style={{ background: color.void, padding: 28 }}>
-                <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash, marginBottom: 14 }}>
-                  {tile.t}
-                </div>
-                <p style={{ margin: 0, fontSize: 15, color: color.smoke }}>{tile.b}</p>
+          <div style={{ marginTop: 56 }}>
+            <Detail summary="How a trade on this market stays private">
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))",
+                  gap: 1,
+                  background: color.hairline,
+                  border: `1px solid ${color.hairline}`,
+                }}
+              >
+                {[
+                  {
+                    t: "The relayer",
+                    b: `Your bet is submitted by a relayer, so your address never appears beside it on chain. The relayer knows it was you — trust is relocated, not removed.`,
+                  },
+                  {
+                    t: "The proof",
+                    b: `A bet proves ${config.circuits.bet.constraints.toLocaleString()} constraints against a ${formatBytes(config.circuits.bet.zkeyBytes)} proving key. It runs on this server, which therefore sees your note secrets — the production design proves in your browser instead.`,
+                  },
+                  {
+                    t: "The payout",
+                    b: `Redeeming pays into a shielded note; no collateral moves and nothing is published. Withdrawing is a separate, public step, taken whenever you like.`,
+                  },
+                ].map((tile) => (
+                  <div key={tile.t} style={{ background: color.void, padding: 28 }}>
+                    <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash, marginBottom: 14 }}>
+                      {tile.t}
+                    </div>
+                    <p style={{ margin: 0, fontSize: 15, color: color.smoke }}>{tile.b}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </Detail>
           </div>
         )}
 

@@ -2,13 +2,15 @@
 
 import { color, font } from "@/lib/atrum/theme";
 import { useOnboardingStep, type OnboardingStepKind } from "@/lib/atrum/onboarding";
+import { useDetailMode } from "@/lib/atrum/detailMode";
 
 /**
  * The guided first run HANDOFF.md's "0-quater" calls the biggest product gap. Where
  * OnboardingBanner gives a one-line nudge on every page, this is the full-page version: the
  * whole shape of the journey shown at once (so none of its five unfamiliar steps surprises
  * anyone), with the CURRENT step -- derived from real state, see onboarding.ts -- expanded and
- * actionable.
+ * actionable. `SEQUENCE`'s copy is duplicated in two altitudes rather than derived, same split
+ * as `onboarding.ts`'s own simple/detailed dictionaries.
  */
 const ORDER: OnboardingStepKind[] = [
   "connect",
@@ -22,7 +24,17 @@ const ORDER: OnboardingStepKind[] = [
   "done",
 ];
 
-const SEQUENCE: { kind: OnboardingStepKind; label: string; note: string }[] = [
+const SIMPLE_SEQUENCE: { kind: OnboardingStepKind; label: string; note: string }[] = [
+  { kind: "connect", label: "Connect your wallet", note: "One signature. No transaction, no gas." },
+  { kind: "prerequisites", label: "Get testnet funds", note: "MON for gas, plus some test collateral to trade with." },
+  { kind: "deposit", label: "Add funds", note: "Moves collateral into your balance." },
+  { kind: "waiting-graft", label: "Brief wait", note: "This is what keeps every trader private, including you." },
+  { kind: "bet", label: "Trade", note: "Pick a market, choose a side." },
+  { kind: "redeem", label: "Claim a win", note: "Claim it, then send it to your wallet whenever you like." },
+  { kind: "withdraw", label: "Send to your wallet", note: "Waiting a bit before sending keeps it private." },
+];
+
+const DETAILED_SEQUENCE: { kind: OnboardingStepKind; label: string; note: string }[] = [
   { kind: "connect", label: "Connect your wallet", note: "One signature. No transaction, no gas." },
   { kind: "prerequisites", label: "Get testnet funds", note: "MON for gas (external faucet) and test collateral (in-app mint)." },
   { kind: "deposit", label: "Deposit", note: "Turns collateral into a note. There is no account balance, only notes." },
@@ -34,6 +46,8 @@ const SEQUENCE: { kind: OnboardingStepKind; label: string; note: string }[] = [
 
 export default function StartPage() {
   const step = useOnboardingStep();
+  const { mode } = useDetailMode();
+  const SEQUENCE = mode === "detailed" ? DETAILED_SEQUENCE : SIMPLE_SEQUENCE;
   const currentIndex = ORDER.indexOf(step.kind);
 
   return (
@@ -42,8 +56,9 @@ export default function StartPage() {
         Start here
       </h1>
       <p style={{ margin: "0 0 56px", fontSize: 19, color: color.smoke, maxWidth: "62ch" }}>
-        Five steps, three of which have no analogue in a market you&apos;ve used before. Here&apos;s the whole shape of it, so
-        none of them reads as broken when you meet it.
+        {mode === "detailed"
+          ? "Five steps, three of which have no analogue in a market you've used before. Here's the whole shape of it, so none of them reads as broken when you meet it."
+          : "A few quick steps to your first trade. Here's the whole path, so nothing feels stuck along the way."}
       </p>
 
       {step.kind !== "done" && (

@@ -2,16 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { color, font, motion } from "@/lib/atrum/theme";
+import { color, font, motion as motionTokens } from "@/lib/atrum/theme";
 import { useMarket } from "@/lib/atrum/marketContext";
 import { useWallet } from "@/lib/atrum/wallet";
+import { useDetailMode } from "@/lib/atrum/detailMode";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import NumberTicker from "@/components/atrum/ui/motion/NumberTicker";
 import Logo from "./Logo";
 
 const NAV = [
-  { href: "/start", label: "Start" },
+  { href: "/start", label: "Guide" },
   { href: "/markets", label: "Markets" },
-  { href: "/notes", label: "Notes" },
-  { href: "/boundary", label: "Boundary" },
+  { href: "/portfolio", label: "Portfolio" },
+  { href: "/wallet", label: "Wallet" },
+  { href: "/privacy", label: "How it's private" },
 ] as const;
 
 function navLinkStyle(active: boolean) {
@@ -22,18 +27,60 @@ function navLinkStyle(active: boolean) {
     letterSpacing: "0.16em",
     color: active ? color.ivory : color.smoke,
     borderBottom: `1px solid ${active ? color.ivory : "transparent"}`,
-    transition: `color ${motion.control}`,
+    transition: `color ${motionTokens.control}`,
   };
 }
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
+function AnonymityIndicator() {
+  const { pool } = useMarket();
+  const { mode } = useDetailMode();
+  if (!pool) return null;
+  const ok = pool.anonymityOk;
+
+  if (mode === "detailed") {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-[11px] uppercase tracking-[0.16em] text-ash">Anonymity set</span>
+        <NumberTicker
+          value={pool.totalDeposits}
+          format={(n) => String(Math.round(n)).padStart(2, "0")}
+          className={`font-mono text-xl ${ok ? "text-ivory" : "text-ember"}`}
+        />
+        <span className="text-[13px] text-pewter">/ {pool.minAnonymitySet} floor</span>
+        <div className="h-4 w-px bg-slate" />
+      </div>
+    );
+  }
+
+  // Simple mode: a compact status dot instead of the raw protocol figures, with the real
+  // numbers a hover away rather than gone entirely.
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex items-center gap-2 cursor-default">
+          <span
+            aria-hidden
+            className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-ivory" : "bg-ember"}`}
+          />
+          <span className="text-[11px] uppercase tracking-[0.16em] text-smoke">
+            {ok ? "Private" : "Building anonymity"}
+          </span>
+          <div className="h-4 w-px bg-slate" />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        {pool.totalDeposits} / {pool.minAnonymitySet} notes in the shared pool
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export default function Header() {
   const pathname = usePathname();
-  const { pool } = useMarket();
   const { address, session, chainOk, connecting, connect, disconnect, switchChain } = useWallet();
-
-  const ok = pool ? pool.anonymityOk : false;
+  const { mode, setMode } = useDetailMode();
 
   return (
     <header
@@ -62,18 +109,14 @@ export default function Header() {
 
       <div style={{ flex: 1 }} />
 
-      {pool && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash }}>
-            Anonymity set
-          </span>
-          <span style={{ fontFamily: font.mono, fontSize: 20, color: ok ? color.ivory : color.ember }}>
-            {String(pool.totalDeposits).padStart(2, "0")}
-          </span>
-          <span style={{ fontSize: 13, color: color.pewter }}>/ {pool.minAnonymitySet} floor</span>
-          <div style={{ width: 1, height: 16, background: color.slate }} />
-        </div>
-      )}
+      <AnonymityIndicator />
+
+      <Tabs value={mode} onValueChange={(v) => setMode(v as "simple" | "detailed")}>
+        <TabsList>
+          <TabsTrigger value="simple">Simple</TabsTrigger>
+          <TabsTrigger value="detailed">Detailed</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {!session ? (
         <button

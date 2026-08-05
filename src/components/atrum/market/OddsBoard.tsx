@@ -1,5 +1,7 @@
 import { color, font, motion } from "@/lib/atrum/theme";
 import type { LiveMarket } from "@/lib/atrum/api";
+import Detail from "@/components/atrum/ui/Detail";
+import NumberTicker from "@/components/atrum/ui/motion/NumberTicker";
 
 export default function OddsBoard({ market }: { market: LiveMarket }) {
   const yesPct = market.oddsYesPct;
@@ -20,16 +22,18 @@ export default function OddsBoard({ market }: { market: LiveMarket }) {
 
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 32, marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-          <span style={{ fontFamily: font.mono, fontWeight: 300, fontSize: "clamp(44px,7vw,96px)", lineHeight: 0.82, color: color.ivory }}>
-            {yesPct}
-          </span>
+          <NumberTicker
+            value={yesPct}
+            className="font-mono font-light leading-[0.82] text-[clamp(44px,7vw,96px)] text-ivory"
+          />
           <span style={{ fontFamily: font.display, fontSize: 22, letterSpacing: "0.16em", color: color.ivory }}>YES</span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
           <span style={{ fontFamily: font.display, fontSize: 22, letterSpacing: "0.16em", color: color.smoke }}>NO</span>
-          <span style={{ fontFamily: font.mono, fontWeight: 300, fontSize: "clamp(44px,7vw,96px)", lineHeight: 0.82, color: color.ash }}>
-            {100 - yesPct}
-          </span>
+          <NumberTicker
+            value={100 - yesPct}
+            className="font-mono font-light leading-[0.82] text-[clamp(44px,7vw,96px)] text-ash"
+          />
         </div>
       </div>
 
@@ -38,11 +42,15 @@ export default function OddsBoard({ market }: { market: LiveMarket }) {
         <div style={{ background: color.iron, flex: 1 }} />
       </div>
 
-      <p style={{ margin: "20px 0 0", fontSize: 15, color: color.smoke, maxWidth: "62ch" }}>
-        {decided
-          ? "These are the decrypted totals, published on chain with a proof that they match the ciphertext the market accumulated."
-          : "Individual stakes are encrypted on chain. This ratio is the pool total decrypted for display — in production it is published coarsely and on a cadence, because a precise live ratio lets an observer solve backwards for a single stake."}
-      </p>
+      <div style={{ marginTop: 20 }}>
+        <Detail summary={decided ? "How this was published" : "Why this number isn't exact"}>
+          <p style={{ margin: 0, fontSize: 15, color: color.smoke, maxWidth: "62ch" }}>
+            {decided
+              ? "These are the decrypted totals, published on chain with a proof that they match the ciphertext the market accumulated."
+              : "Individual stakes are encrypted on chain. This ratio is the pool total decrypted for display — in production it is published coarsely and on a cadence, because a precise live ratio lets an observer solve backwards for a single stake."}
+          </p>
+        </Detail>
+      </div>
     </div>
   );
 }

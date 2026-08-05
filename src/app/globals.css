@@ -1,3 +1,6 @@
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+
 html,
 body {
   margin: 0;
@@ -52,25 +55,8 @@ button {
   color: #06070a !important;
 }
 
-/* Product UI (/market, /notes, /boundary) — see ATRUM-UI-PROMPT.md */
-@keyframes atrum-sweep {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(520%);
-  }
-}
-@keyframes atrum-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
+/* Product UI (/market, /portfolio, /wallet) — see ATRUM-UI-PROMPT.md.
+   atrum-rise/atrum-sweep retired: ActivityOverlay/ReceiptOverlay now animate via Framer Motion. */
 @keyframes atrum-aperture {
   from {
     transform: scaleX(0);
@@ -81,6 +67,46 @@ button {
     opacity: 1;
   }
 }
+@keyframes atrum-collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+@keyframes atrum-collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+@property --atrum-beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes atrum-beam-spin {
+  to {
+    --atrum-beam-angle: 360deg;
+  }
+}
+@keyframes atrum-shimmer-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
 @keyframes atrum-drift {
   0%,
   100% {
