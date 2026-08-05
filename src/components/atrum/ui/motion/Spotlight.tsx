@@ -16,9 +16,9 @@ export default function Spotlight({ className }: { className?: string }) {
       className={cn("pointer-events-none absolute inset-0", className)}
       style={{
         backgroundImage:
-          "radial-gradient(60% 40% at 50% -10%, rgba(240,217,176,0.07) 0%, rgba(240,217,176,0.02) 40%, rgba(6,7,10,0) 70%)",
+          "radial-gradient(120% 62% at 50% -18%, rgba(240,217,176,0.055) 0%, rgba(240,217,176,0.014) 34%, rgba(6,7,10,0) 66%)",
       }}
-      animate={{ opacity: [0.7, 1, 0.7] }}
+      animate={{ opacity: [0.85, 1, 0.85] }}
       transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
     />
   );

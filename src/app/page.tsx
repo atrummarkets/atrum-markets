@@ -27,7 +27,7 @@ export default function Home() {
       {/* The doors opening are this page's one reveal — no second entrance animation stacked on top. */}
       <div style={{ position: "relative", textAlign: "center", maxWidth: 640 }}>
         <div style={{ marginBottom: 32 }}>
-          <Logo size={30} tint={color.ash} />
+          <Logo size={30} />
         </div>
         <h1
           style={{
