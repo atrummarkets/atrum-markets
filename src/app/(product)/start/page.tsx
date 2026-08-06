@@ -1,6 +1,6 @@
 "use client";
 
-import { color, font } from "@/lib/atrum/theme";
+import { color, font, motion } from "@/lib/atrum/theme";
 import { useOnboardingStep, type OnboardingStepKind } from "@/lib/atrum/onboarding";
 import { useDetailMode } from "@/lib/atrum/detailMode";
 
@@ -111,6 +111,7 @@ export default function StartPage() {
                 padding: "20px 0",
                 borderBottom: `1px solid ${color.hairline}`,
                 opacity: state === "upcoming" ? 0.45 : 1,
+                transition: `opacity ${motion.local}`,
               }}
             >
               <span

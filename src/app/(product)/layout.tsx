@@ -4,11 +4,14 @@ import { WalletProvider } from "@/lib/atrum/wallet";
 import { MarketProvider } from "@/lib/atrum/marketContext";
 import { DetailModeProvider } from "@/lib/atrum/detailMode";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Header from "@/components/atrum/Header";
+import HeaderTicker from "@/components/atrum/HeaderTicker";
+import Sidebar from "@/components/atrum/Sidebar";
 import Footer from "@/components/atrum/Footer";
 import ActivityOverlay from "@/components/atrum/ActivityOverlay";
 import ReceiptOverlay from "@/components/atrum/ReceiptOverlay";
+import CommandPalette from "@/components/atrum/CommandPalette";
 import OnboardingBanner from "@/components/atrum/onboarding/OnboardingBanner";
+import PageTransition from "@/components/atrum/PageTransition";
 
 export const metadata: Metadata = {
   title: "Atrum — Markets",
@@ -33,11 +36,15 @@ export default function ProductLayout({ children }: { children: React.ReactNode 
                 lineHeight: 1.5,
               }}
             >
-              <Header />
-              <OnboardingBanner />
-              {children}
-              <Footer />
+              <HeaderTicker />
+              <Sidebar />
+              <div className="pt-8 md:ml-60">
+                <OnboardingBanner />
+                <PageTransition>{children}</PageTransition>
+                <Footer />
+              </div>
             </div>
+            <CommandPalette />
             <ActivityOverlay />
             <ReceiptOverlay />
           </TooltipProvider>

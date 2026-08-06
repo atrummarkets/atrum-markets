@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
+import confetti from "canvas-confetti";
 import { color, font } from "@/lib/atrum/theme";
 import { formatElapsed, formatGas, shortHash, shortAddress, txUrl, addressUrl } from "@/lib/atrum/format";
 import { useMarket } from "@/lib/atrum/marketContext";
@@ -19,6 +21,24 @@ const TITLE = {
 export default function ReceiptOverlay() {
   const { receipt, dismissReceipt } = useMarket();
   const router = useRouter();
+  const firedFor = useRef<string | null>(null);
+
+  // Claiming a resolved winning position -- the one celebratory beat in the app. Guarded by
+  // txHash so it fires once per receipt, not on every re-render while the dialog is open.
+  useEffect(() => {
+    if (!receipt || receipt.kind !== "redeem") return;
+    if (firedFor.current === receipt.txHash) return;
+    firedFor.current = receipt.txHash;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    confetti({
+      particleCount: 40,
+      spread: 60,
+      startVelocity: 28,
+      origin: { y: 0.3 },
+      colors: [color.halo, color.champagne, color.ivory],
+      disableForReducedMotion: true,
+    });
+  }, [receipt]);
 
   return (
     <AnimatePresence>

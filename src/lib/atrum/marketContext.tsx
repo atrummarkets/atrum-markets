@@ -29,6 +29,10 @@ import {
 } from "./api";
 
 const POLL_MS = 5000;
+/** ~5 min of session-local odds history at the current poll rate -- not fetched, not persisted,
+ * gone on refresh. Honest labeling of this (see Sparkline.tsx) matters: it is the actually-
+ * observed record of this browser tab's session, never a stand-in for real price history. */
+const ODDS_HISTORY_CAP = 60;
 
 const DEPOSIT_ABI = parseAbi([
   "function deposit(uint256[2] pA, uint256[2][2] pB, uint256[2] pC, uint256 commitment, uint256 units)",
@@ -84,6 +88,8 @@ interface Value {
   error: string | null;
   /** Collateral balance of the connected wallet, in units (not raw token amount). */
   walletUnits: number | null;
+  /** Session-local odds history for one market, oldest first -- see ODDS_HISTORY_CAP. */
+  getOddsHistory: (marketId: number) => { t: number; pct: number }[];
   refresh: () => void;
   dismissReceipt: () => void;
   clearError: () => void;
@@ -110,12 +116,18 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
   const poolRef = useRef<PoolState | null>(null);
+  const oddsHistoryRef = useRef<Map<number, { t: number; pct: number }[]>>(new Map());
 
   const refresh = useCallback(() => {
     fetchMarkets()
       .then((d) => {
         setMarkets(d.markets);
         setPool(d.pool);
+        const t = Date.now();
+        for (const m of d.markets) {
+          const prev = oddsHistoryRef.current.get(m.marketId) ?? [];
+          oddsHistoryRef.current.set(m.marketId, [...prev, { t, pct: m.oddsYesPct }].slice(-ODDS_HISTORY_CAP));
+        }
       })
       .catch(() => {});
 
@@ -368,6 +380,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       receiptHistory,
       error,
       walletUnits,
+      getOddsHistory: (marketId: number) => oddsHistoryRef.current.get(marketId) ?? [],
       refresh,
       dismissReceipt: () => setReceipt(null),
       clearError: () => setError(null),
@@ -387,4 +400,8 @@ export function useMarket(): Value {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useMarket must be used within a MarketProvider");
   return ctx;
+}
+
+export function useOddsHistory(marketId: number): { t: number; pct: number }[] {
+  return useMarket().getOddsHistory(marketId);
 }

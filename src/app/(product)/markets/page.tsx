@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { color, font, motion } from "@/lib/atrum/theme";
+import { color, font } from "@/lib/atrum/theme";
 import { formatCountdown } from "@/lib/atrum/format";
 import { useMarket } from "@/lib/atrum/marketContext";
-import type { LiveMarket, PoolState } from "@/lib/atrum/api";
+import type { LiveMarket } from "@/lib/atrum/api";
 import Shimmer from "@/components/atrum/ui/motion/Shimmer";
-import Marquee from "@/components/atrum/ui/motion/Marquee";
+import AnimatedList from "@/components/atrum/ui/motion/AnimatedList";
+import CardGlow from "@/components/atrum/ui/CardGlow";
+import CountdownBar from "@/components/atrum/ui/CountdownBar";
 
 function PhaseTag({ m }: { m: LiveMarket }) {
   const map = {
@@ -29,23 +31,15 @@ function Card({ m, now }: { m: LiveMarket; now: number }) {
   return (
     <Link
       href={`/market/${m.marketId}`}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        gap: 32,
-        padding: 32,
-        minHeight: 260,
-        background: color.basalt,
-        border: `1px solid ${color.hairline}`,
-        borderRadius: 2,
-        textDecoration: "none",
-        color: color.bone,
-        transition: `border-color ${motion.control}`,
+      className="group relative flex flex-col justify-between gap-8 overflow-hidden border border-hairline bg-basalt p-8 text-bone no-underline transition-[transform,border-color] duration-control ease-control hover:-translate-y-1 hover:border-hairlineStrong"
+      style={{ minHeight: 260, borderRadius: 2 }}
+      onMouseMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        e.currentTarget.style.setProperty("--spot-x", `${e.clientX - rect.left}px`);
+        e.currentTarget.style.setProperty("--spot-y", `${e.clientY - rect.top}px`);
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = color.hairlineStrong)}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = color.hairline)}
     >
+      <CardGlow />
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash }}>
@@ -90,21 +84,10 @@ function Card({ m, now }: { m: LiveMarket; now: number }) {
             {open ? formatCountdown(m.bettingCloseTime - now) : "—"}
           </span>
         </div>
+        {open && <CountdownBar closeTime={m.bettingCloseTime} now={now} className="mt-2" />}
       </div>
     </Link>
   );
-}
-
-/** Real, aggregate, anonymized pool facts only -- never a specific bet, side, or amount. This
- * is activity-as-trust-signal, not a logo strip: it's also a live illustration of the
- * anonymity set actually growing. */
-function poolMarqueeItems(pool: PoolState): string[] {
-  return [
-    `${pool.totalDeposits} notes in the shared pool`,
-    `${pool.batchCount} batch${pool.batchCount === 1 ? "" : "es"} grafted`,
-    `${pool.queuedCount} queued for the next graft`,
-    `${pool.minAnonymitySet}-note floor per market`,
-  ];
 }
 
 function CardSkeleton() {
@@ -123,7 +106,7 @@ function CardSkeleton() {
 }
 
 export default function MarketsPage() {
-  const { markets, pool, error } = useMarket();
+  const { markets, error } = useMarket();
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
   useEffect(() => {
@@ -150,17 +133,6 @@ export default function MarketsPage() {
         total — nobody, including us, sees what you staked until the market settles.
       </p>
 
-      {pool && (
-        <Marquee
-          items={poolMarqueeItems(pool).map((t) => (
-            <span key={t} style={{ fontFamily: font.mono, fontSize: 13, color: color.ash }}>
-              {t}
-            </span>
-          ))}
-          className="mb-14 border-y border-hairline py-3"
-        />
-      )}
-
       {error && (
         <div style={{ marginBottom: 32, padding: 20, border: `1px solid ${color.ember}`, color: color.ember, fontSize: 15 }}>
           {error}
@@ -174,11 +146,13 @@ export default function MarketsPage() {
           ))}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(360px,1fr))", gap: 20 }}>
-          {markets.map((m) => (
-            <Card key={m.marketId} m={m} now={now} />
-          ))}
-        </div>
+        <AnimatedList
+          items={markets}
+          keyExtractor={(m) => String(m.marketId)}
+          renderItem={(m) => <Card m={m} now={now} />}
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(360px,1fr))", gap: 20 }}
+          staggerMs={60}
+        />
       )}
     </main>
   );

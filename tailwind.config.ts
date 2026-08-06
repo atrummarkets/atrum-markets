@@ -1,5 +1,5 @@
 import type { Config } from "tailwindcss";
-import { color, font, motion } from "./src/lib/atrum/theme";
+import { color, font, motion, type, space } from "./src/lib/atrum/theme";
 
 /**
  * `theme.ts` stays the single source of truth. This file only re-projects it into Tailwind's
@@ -19,6 +19,11 @@ for (const [name, token] of Object.entries(motion)) {
   eases[name] = ease;
 }
 
+const spacing: Record<string, string> = {};
+for (const [name, px] of Object.entries(space)) {
+  spacing[name] = `${px}px`;
+}
+
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
@@ -35,6 +40,8 @@ const config: Config = {
         none: "0px",
         full: "9999px",
       },
+      fontSize: { ...type },
+      spacing,
       transitionDuration: durations,
       transitionTimingFunction: eases,
     },

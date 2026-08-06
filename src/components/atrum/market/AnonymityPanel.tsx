@@ -28,6 +28,7 @@ export default function AnonymityPanel({ pool }: { pool: PoolState }) {
               format={(n) => String(Math.round(n)).padStart(2, "0")}
               className={`font-mono font-light leading-[0.82] text-[clamp(44px,7vw,96px)] ${ok ? "text-ivory" : "text-ember"}`}
               durationMs={700}
+              flashOnChange
             />
             <span style={{ fontSize: 18, color: color.pewter, maxWidth: "20ch" }}>
               {mode === "detailed" ? "notes in the shared pool" : `${others} other position${others === 1 ? "" : "s"} mixed with yours`}

@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
-import { color, font } from "@/lib/atrum/theme";
+import { color, font, space } from "@/lib/atrum/theme";
 import { useMarket } from "@/lib/atrum/marketContext";
 import { useWallet } from "@/lib/atrum/wallet";
 import { useDetailMode } from "@/lib/atrum/detailMode";
 import { txUrl, shortHash } from "@/lib/atrum/format";
 import type { LiveNote } from "@/lib/atrum/api";
 import WithdrawDialog from "@/components/atrum/WithdrawDialog";
+import AnimatedList from "@/components/atrum/ui/motion/AnimatedList";
+import NumberTicker from "@/components/atrum/ui/motion/NumberTicker";
 import { useState } from "react";
 
 const COLUMNS = "150px 1fr 130px 150px 200px";
@@ -133,7 +135,7 @@ export default function PortfolioPage() {
   }
 
   return (
-    <main style={{ padding: "80px 64px 128px", maxWidth: 1300 }}>
+    <main style={{ padding: `${space.pageYTop}px ${space.pageX}px ${space.pageYBottom}px`, maxWidth: 1300 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 32, flexWrap: "wrap", marginBottom: 16 }}>
         <h1 style={{ fontFamily: font.display, fontWeight: 400, fontSize: "clamp(30px,3.6vw,46px)", color: color.ivory, margin: 0 }}>
           Your portfolio
@@ -172,6 +174,7 @@ export default function PortfolioPage() {
       ) : (
         <div style={{ border: `1px solid ${color.hairline}` }}>
           <div
+            className="sticky top-8 z-10 bg-void"
             style={{
               display: "grid",
               gridTemplateColumns: COLUMNS,
@@ -191,68 +194,77 @@ export default function PortfolioPage() {
             <span>Actions</span>
           </div>
 
-          {notes.map((n) => {
-            const d = describe(n, settledMarkets, winners);
-            const busy = activity?.noteId === n.id;
-            const stateLabel = mode === "detailed" ? d.detailedState : d.simpleState;
-            const detailLine = mode === "detailed" ? d.detailedDetail : d.simpleDetail;
-            const actionLabel = d.action ? ACTION_LABEL[d.action][mode === "detailed" ? "detailed" : "simple"] : null;
-            return (
-              <div
-                key={n.id}
-                style={{ display: "grid", gridTemplateColumns: COLUMNS, gap: 24, padding: "24px 28px", borderBottom: `1px solid ${color.hairline}`, alignItems: "center" }}
-              >
-                <span style={{ fontFamily: font.mono, fontSize: 14, color: color.pewter }}>0x{n.id}</span>
-                <div>
-                  <div style={{ fontFamily: font.display, fontSize: 21, letterSpacing: "0.14em", color: d.tone }}>{stateLabel}</div>
-                  <div style={{ fontSize: 13, color: color.ash, marginTop: 4 }}>{detailLine}</div>
-                </div>
-                <span style={{ fontFamily: font.mono, fontSize: 14, color: color.bone }}>{n.units}</span>
-                <span style={{ fontFamily: font.mono, fontSize: 12 }}>
-                  {n.txHash ? (
-                    <a href={txUrl(n.txHash)} target="_blank" rel="noreferrer" style={{ color: color.ash, textDecoration: "none" }}>
-                      {shortHash(n.txHash)} ↗
-                    </a>
-                  ) : (
-                    <span style={{ color: color.iron }}>—</span>
-                  )}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                  {d.action === null ? (
-                    <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.iron }}>—</span>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        if (d.action === "bet") router.push("/markets");
-                        else if (d.action === "redeem") redeem(n.id);
-                        else setWithdrawing(n);
-                      }}
-                      disabled={!!activity}
-                      style={{
-                        padding: "11px 18px",
-                        border: `1px solid ${d.action === "redeem" ? color.halo : color.hairlineStrong}`,
-                        background: "none",
-                        color: activity ? color.ash : d.action === "redeem" ? color.halo : color.bone,
-                        borderRadius: 2,
-                        cursor: activity ? "wait" : "pointer",
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.16em",
-                      }}
+          <AnimatedList
+            items={notes}
+            keyExtractor={(n) => n.id}
+            staggerMs={40}
+            renderItem={(n, i) => {
+              const d = describe(n, settledMarkets, winners);
+              const busy = activity?.noteId === n.id;
+              const stateLabel = mode === "detailed" ? d.detailedState : d.simpleState;
+              const detailLine = mode === "detailed" ? d.detailedDetail : d.simpleDetail;
+              const actionLabel = d.action ? ACTION_LABEL[d.action][mode === "detailed" ? "detailed" : "simple"] : null;
+              return (
+                <div
+                  className={`transition-colors duration-control ease-control hover:bg-graphite ${i % 2 === 1 ? "bg-basalt/40" : ""}`}
+                  style={{ display: "grid", gridTemplateColumns: COLUMNS, gap: 24, padding: "24px 28px", borderBottom: `1px solid ${color.hairline}`, alignItems: "center" }}
+                >
+                  <span style={{ fontFamily: font.mono, fontSize: 14, color: color.pewter }}>0x{n.id}</span>
+                  <div>
+                    <div style={{ fontFamily: font.display, fontSize: 21, letterSpacing: "0.14em", color: d.tone }}>{stateLabel}</div>
+                    <div style={{ fontSize: 13, color: color.ash, marginTop: 4 }}>{detailLine}</div>
+                  </div>
+                  <NumberTicker
+                    value={Number(n.units)}
+                    className="font-mono text-sm text-bone"
+                    flashOnChange
+                  />
+                  <span style={{ fontFamily: font.mono, fontSize: 12 }}>
+                    {n.txHash ? (
+                      <a href={txUrl(n.txHash)} target="_blank" rel="noreferrer" style={{ color: color.ash, textDecoration: "none" }}>
+                        {shortHash(n.txHash)} ↗
+                      </a>
+                    ) : (
+                      <span style={{ color: color.iron }}>—</span>
+                    )}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    {d.action === null ? (
+                      <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.iron }}>—</span>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (d.action === "bet") router.push("/markets");
+                          else if (d.action === "redeem") redeem(n.id);
+                          else setWithdrawing(n);
+                        }}
+                        disabled={!!activity}
+                        style={{
+                          padding: "11px 18px",
+                          border: `1px solid ${d.action === "redeem" ? color.halo : color.hairlineStrong}`,
+                          background: "none",
+                          color: activity ? color.ash : d.action === "redeem" ? color.halo : color.bone,
+                          borderRadius: 2,
+                          cursor: activity ? "wait" : "pointer",
+                          fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.16em",
+                        }}
+                      >
+                        {busy ? "Working…" : actionLabel}
+                      </button>
+                    )}
+                    <Link
+                      href={`/privacy/${n.id}`}
+                      style={{ fontSize: 12, color: color.ash, textDecoration: "underline", textDecorationColor: color.hairline }}
                     >
-                      {busy ? "Working…" : actionLabel}
-                    </button>
-                  )}
-                  <Link
-                    href={`/privacy/${n.id}`}
-                    style={{ fontSize: 12, color: color.ash, textDecoration: "underline", textDecorationColor: color.hairline }}
-                  >
-                    How this stayed private
-                  </Link>
+                      How this stayed private
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            }}
+          />
         </div>
       )}
 

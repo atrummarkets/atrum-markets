@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { color, font } from "@/lib/atrum/theme";
 import { formatCountdown, formatBytes, addressUrl } from "@/lib/atrum/format";
@@ -11,7 +11,9 @@ import AnonymityPanel from "@/components/atrum/market/AnonymityPanel";
 import BetTicket from "@/components/atrum/market/BetTicket";
 import AdminPanel from "@/components/atrum/market/AdminPanel";
 import Detail from "@/components/atrum/ui/Detail";
+import CountdownBar from "@/components/atrum/ui/CountdownBar";
 import TextReveal from "@/components/atrum/ui/motion/TextReveal";
+import AnimatedBeam from "@/components/atrum/ui/motion/AnimatedBeam";
 
 export default function MarketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -20,6 +22,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const { markets, pool, notes, config, error } = useMarket();
   const { session } = useWallet();
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  const explainerGridRef = useRef<HTMLDivElement>(null);
+  const relayerTileRef = useRef<HTMLDivElement>(null);
+  const proofTileRef = useRef<HTMLDivElement>(null);
+  const payoutTileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
@@ -51,7 +57,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const poolUnits = market.yesUnits + market.noUnits;
 
   return (
-    <main style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 464px", alignItems: "start", minHeight: "calc(100vh - 64px)" }}>
+    <main style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 464px", alignItems: "start", minHeight: "calc(100vh - 32px)" }}>
       <section style={{ padding: "64px 64px 128px", minWidth: 0 }}>
         <Link href="/markets" style={{ fontSize: 13, color: color.ash, textDecoration: "none" }}>
           ← All markets
@@ -118,6 +124,9 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
             <div style={{ fontFamily: font.mono, fontSize: 22, color: color.bone }}>
               {market.phase === "betting" ? formatCountdown(market.bettingCloseTime - now) : "closed"}
             </div>
+            {market.phase === "betting" && (
+              <CountdownBar closeTime={market.bettingCloseTime} now={now} className="w-40" />
+            )}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash }}>Pool</div>
@@ -142,7 +151,9 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           <div style={{ marginTop: 56 }}>
             <Detail summary="How a trade on this market stays private">
               <div
+                ref={explainerGridRef}
                 style={{
+                  position: "relative",
                   display: "grid",
                   gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))",
                   gap: 1,
@@ -150,42 +161,51 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                   border: `1px solid ${color.hairline}`,
                 }}
               >
-                {[
-                  {
-                    t: "The relayer",
-                    b: `Your bet is submitted by a relayer, so your address never appears beside it on chain. The relayer knows it was you — trust is relocated, not removed.`,
-                  },
-                  {
-                    t: "The proof",
-                    b: `A bet proves ${config.circuits.bet.constraints.toLocaleString()} constraints against a ${formatBytes(config.circuits.bet.zkeyBytes)} proving key. It runs on this server, which therefore sees your note secrets — the production design proves in your browser instead.`,
-                  },
-                  {
-                    t: "The payout",
-                    b: `Redeeming pays into a shielded note; no collateral moves and nothing is published. Withdrawing is a separate, public step, taken whenever you like.`,
-                  },
-                ].map((tile) => (
-                  <div key={tile.t} style={{ background: color.void, padding: 28 }}>
-                    <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash, marginBottom: 14 }}>
-                      {tile.t}
-                    </div>
-                    <p style={{ margin: 0, fontSize: 15, color: color.smoke }}>{tile.b}</p>
+                <AnimatedBeam containerRef={explainerGridRef} fromRef={relayerTileRef} toRef={proofTileRef} />
+                <AnimatedBeam containerRef={explainerGridRef} fromRef={proofTileRef} toRef={payoutTileRef} />
+                <div ref={relayerTileRef} style={{ background: color.void, padding: 28 }}>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash, marginBottom: 14 }}>
+                    The relayer
                   </div>
-                ))}
+                  <p style={{ margin: 0, fontSize: 15, color: color.smoke }}>
+                    Your bet is submitted by a relayer, so your address never appears beside it on chain. The
+                    relayer knows it was you — trust is relocated, not removed.
+                  </p>
+                </div>
+                <div ref={proofTileRef} style={{ background: color.void, padding: 28 }}>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash, marginBottom: 14 }}>
+                    The proof
+                  </div>
+                  <p style={{ margin: 0, fontSize: 15, color: color.smoke }}>
+                    A bet proves {config.circuits.bet.constraints.toLocaleString()} constraints against a{" "}
+                    {formatBytes(config.circuits.bet.zkeyBytes)} proving key. It runs on this server, which
+                    therefore sees your note secrets — the production design proves in your browser instead.
+                  </p>
+                </div>
+                <div ref={payoutTileRef} style={{ background: color.void, padding: 28 }}>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash, marginBottom: 14 }}>
+                    The payout
+                  </div>
+                  <p style={{ margin: 0, fontSize: 15, color: color.smoke }}>
+                    Redeeming pays into a shielded note; no collateral moves and nothing is published. Withdrawing
+                    is a separate, public step, taken whenever you like.
+                  </p>
+                </div>
               </div>
             </Detail>
           </div>
         )}
 
-        <AdminPanel market={market} />
+        <AdminPanel market={market} now={now} />
       </section>
 
       <aside
         style={{
           position: "sticky",
-          top: 64,
+          top: 32,
           background: color.basalt,
           borderLeft: `1px solid ${color.hairline}`,
-          minHeight: "calc(100vh - 64px)",
+          minHeight: "calc(100vh - 32px)",
           padding: "40px 32px",
         }}
       >
