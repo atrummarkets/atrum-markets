@@ -4,6 +4,7 @@ import { useState } from "react";
 import { color, font } from "@/lib/atrum/theme";
 import { doResolve, doSettle, type LiveMarket } from "@/lib/atrum/api";
 import { useMarket } from "@/lib/atrum/marketContext";
+import { useWallet } from "@/lib/atrum/wallet";
 import { txUrl, shortHash } from "@/lib/atrum/format";
 
 /**
@@ -14,16 +15,25 @@ import { txUrl, shortHash } from "@/lib/atrum/format";
  * point `resolver` at `PythResolver`, where the outcome is a comparison against a signed price
  * and no address can decide it. Hiding this panel would not make the market trustless; saying
  * so is the honest option.
+ *
+ * Also hidden from anyone who is not the operator. That is presentation only -- the real check
+ * is `requireOperator` on the routes, because a panel this component declines to render is
+ * still two `fetch` calls away for anyone who reads the bundle.
  */
 export default function AdminPanel({ market }: { market: LiveMarket }) {
-  const { refresh } = useMarket();
+  const { refresh, config } = useMarket();
+  const { session } = useWallet();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; hash?: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  const isOperator =
+    !!session && !!config?.operator && session.toLowerCase() === config.operator.toLowerCase();
+
   const now = Math.floor(Date.now() / 1000);
   const resolvable = market.phase === "closed" && now >= market.resolutionStartTime;
   const settleable = market.phase === "resolved";
+  if (!isOperator) return null;
   if (!resolvable && !settleable) return null;
 
   async function act(what: string, fn: () => Promise<{ txHash: string }>) {

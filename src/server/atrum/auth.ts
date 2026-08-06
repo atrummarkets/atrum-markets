@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { verifyMessage, getAddress } from "viem";
 import { db } from "./db";
+import { operatorAddress } from "./chain";
 
 /**
  * Signature-based sessions.
@@ -114,5 +115,29 @@ export async function currentUser(): Promise<string | null> {
 export async function requireUser(): Promise<string> {
   const user = await currentUser();
   if (!user) throw new Error("not signed in -- connect your wallet");
+  return user;
+}
+
+/**
+ * The signed-in address, and it must be the operator's.
+ *
+ * WHAT THIS CLOSES. `/api/atrum/admin/resolve` and `/api/atrum/admin/settle` had no auth at
+ * all. This server holds the resolver key -- on every manual-resolver market `Vault.resolver`
+ * IS the operator EOA -- so an unauthenticated resolve endpoint let anyone on the internet
+ * choose the outcome of any unresolved market, then redeem against the side they chose. The
+ * testnet access gate hid it; removing that gate exposed it.
+ *
+ * Gated on the session address rather than a shared secret because the admin panel runs in a
+ * browser. A secret the browser must hold to call the endpoint is a secret the browser hands
+ * to anyone who opens devtools, which is not a gate.
+ *
+ * `operatorAddress` is derived from the same `PRIVATE_KEY` that signs the resolve, so this
+ * cannot drift out of agreement with who is actually authorised on chain.
+ */
+export async function requireOperator(): Promise<string> {
+  const user = await requireUser();
+  if (user.toLowerCase() !== operatorAddress.toLowerCase()) {
+    throw new Error("not authorised -- this action is operator-only");
+  }
   return user;
 }

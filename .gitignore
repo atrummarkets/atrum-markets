@@ -47,3 +47,6 @@ next-env.d.ts
 circuits-build/committee-key.json
 scripts/bet-storm-keys.json
 /.data
+
+# Proving artifacts staged from circuits-build/ at build time. Never committed.
+/public/circuits
