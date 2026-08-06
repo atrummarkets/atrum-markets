@@ -51,6 +51,38 @@ const STATEMENTS = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS gate_attempts_ip_created_idx ON gate_attempts (ip, created_at)`,
+  // The market registry, moved off disk.
+  //
+  // It used to be markets.json, read with readFileSync from the deployment bundle -- so
+  // creating a market meant a git push and a full redeploy before production could see it.
+  // The chain cannot supply the list on its own (ShieldedPool has a `marketVault[id]` mapping,
+  // no array) and this project refuses to build on eth_getLogs against a 100-block cap, so
+  // something off-chain has to hold it. A table is that something, and it is visible the
+  // moment a row lands.
+  //
+  // Still only a CACHE OF IDS AND LABELS. Betting window, outcome and settled totals are
+  // re-read from chain on every request in markets.ts, exactly as before, so a wrong row can
+  // list or omit a market but never misstate one. `vault` is safe to store because
+  // `marketVault[id]` is write-once on chain -- registerEncryptedMarket reverts with
+  // MarketAlreadyRegistered if the id is taken, so the address can never change under us.
+  //
+  // Keyed by (pool, id): markets belong to a pool, and this deployment has already orphaned
+  // several pools. The old file had one top-level `pool` field and would happily have served
+  // a previous pool's markets against a new one.
+  `CREATE TABLE IF NOT EXISTS markets (
+    pool text NOT NULL,
+    id integer NOT NULL,
+    question text NOT NULL,
+    category text NOT NULL,
+    resolver_type text NOT NULL,
+    vault text NOT NULL,
+    resolver text NOT NULL,
+    betting_close_time bigint NOT NULL,
+    resolution_start_time bigint NOT NULL,
+    created_at bigint NOT NULL,
+    spec jsonb,
+    PRIMARY KEY (pool, id)
+  )`,
 ];
 
 for (const sql of STATEMENTS) {

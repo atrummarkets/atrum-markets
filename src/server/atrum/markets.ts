@@ -162,13 +162,13 @@ async function readOne(entry: RegistryMarket): Promise<MarketSnapshot> {
 }
 
 export async function readMarket(id: number): Promise<MarketSnapshot> {
-  const entry = registryMarket(id);
+  const entry = await registryMarket(id);
   if (!entry) throw new Error(`market ${id} is not in the registry`);
   return readOne(entry);
 }
 
 export async function readAllMarkets(): Promise<MarketSnapshot[]> {
-  const { markets } = loadRegistry();
+  const { markets } = await loadRegistry();
   const snapshots = await Promise.all(markets.map(readOne));
   // Open markets first, closing soonest at the top; everything decided sinks to the bottom.
   const rank = (m: MarketSnapshot) => (m.phase === "betting" ? 0 : m.phase === "closed" ? 1 : 2);
