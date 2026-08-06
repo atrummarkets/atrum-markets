@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { POOL_ADDRESS, COLLATERAL_ADDRESS, CHAIN_ID, PUBLIC_RPC_URL, publicClient, ERC20_ABI, POOL_ABI } from "@/server/atrum/chain";
+import { POOL_ADDRESS, COLLATERAL_ADDRESS, CHAIN_ID, PUBLIC_RPC_URL, publicClient, ERC20_ABI, POOL_ABI, operatorAddress } from "@/server/atrum/chain";
 import { readPool } from "@/server/atrum/markets";
 import { circuitFacts } from "@/server/atrum/circuits";
 
@@ -25,6 +25,10 @@ export async function GET() {
         redeem: circuitFacts("redeem_private"),
         withdraw: circuitFacts("withdraw"),
       },
+      // Public already -- it is the `from` on every resolve and settle transaction, and the
+      // `resolver` stored in each demo market's Vault. Served so the UI can hide operator
+      // controls from everyone else; the routes enforce it regardless.
+      operator: operatorAddress,
       poolAbi: POOL_ABI,
     });
   } catch (error) {

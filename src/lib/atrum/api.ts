@@ -38,6 +38,8 @@ export interface AppConfig {
   collateral: `0x${string}`;
   token: { symbol: string; decimals: number };
   poolState: PoolState;
+  /** The operator EOA. Resolve/settle are restricted to it; the UI hides its controls. */
+  operator: `0x${string}`;
   circuits: Record<"deposit" | "bet" | "redeem" | "withdraw", CircuitFacts>;
   poolAbi: unknown[];
 }
