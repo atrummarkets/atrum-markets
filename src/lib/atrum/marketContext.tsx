@@ -15,6 +15,7 @@ import { useWallet } from "./wallet";
 import {
   fetchConfig,
   fetchMarkets,
+  fetchMarket,
   fetchNotes,
   prepareDeposit,
   confirmDeposit,
@@ -27,12 +28,29 @@ import {
   type PoolState,
   type RelayedResult,
 } from "./api";
+import { useVault } from "./client/useVault";
+import * as clientActions from "./client/actions";
+import type { FetchProgress } from "./client/artifacts";
 
 const POLL_MS = 5000;
 /** ~5 min of session-local odds history at the current poll rate -- not fetched, not persisted,
  * gone on refresh. Honest labeling of this (see Sparkline.tsx) matters: it is the actually-
  * observed record of this browser tab's session, never a stand-in for real price history. */
 const ODDS_HISTORY_CAP = 60;
+
+/**
+ * Whether this build proves in the browser.
+ *
+ * A build-time constant, not a runtime toggle: the two paths store notes in different places
+ * (Postgres rows with secrets vs. an encrypted vault), and letting a single deployment flip
+ * between them at runtime would strand notes in whichever store was not being read. Flipping
+ * it is a deploy, deliberately.
+ *
+ * The server-side path is left fully intact behind this flag rather than deleted. It is what
+ * every live note on the current deployment was created with, and deleting the only code that
+ * can spend them would burn real testnet positions.
+ */
+const CLIENT_PROVING = process.env.NEXT_PUBLIC_CLIENT_PROVING === "1";
 
 const DEPOSIT_ABI = parseAbi([
   "function deposit(uint256[2] pA, uint256[2][2] pB, uint256[2] pC, uint256 commitment, uint256 units)",
@@ -51,6 +69,12 @@ export interface Activity {
   step: string;
   startedAt: number;
   noteId?: string;
+  /**
+   * Artifact download progress, present only while a client-side proof is fetching its
+   * circuit. `bet_encrypted` is 11.8MB on first use, which is long enough that a step label
+   * with no number reads as a hang.
+   */
+  download?: { loaded: number; total: number };
 }
 
 export interface Receipt {
@@ -90,6 +114,10 @@ interface Value {
   walletUnits: number | null;
   /** Session-local odds history for one market, oldest first -- see ODDS_HISTORY_CAP. */
   getOddsHistory: (marketId: number) => { t: number; pct: number }[];
+  /** True when this build proves in the browser and never sends the server a note secret. */
+  clientProving: boolean;
+  /** Whether the note vault has been unlocked this session. Meaningless unless `clientProving`. */
+  vaultUnlocked: boolean;
   refresh: () => void;
   dismissReceipt: () => void;
   clearError: () => void;
@@ -103,7 +131,7 @@ interface Value {
 const Ctx = createContext<Value | null>(null);
 
 export function MarketProvider({ children }: { children: ReactNode }) {
-  const { session, address, walletClient, publicClient } = useWallet();
+  const { session, address, walletClient, publicClient, signMessage } = useWallet();
 
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [markets, setMarkets] = useState<LiveMarket[]>([]);
@@ -118,6 +146,17 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   const poolRef = useRef<PoolState | null>(null);
   const oddsHistoryRef = useRef<Map<number, { t: number; pct: number }[]>>(new Map());
 
+  const vault = useVault(
+    CLIENT_PROVING ? signMessage : null,
+    config?.committeePubKey ?? null,
+    session,
+  );
+
+  // Under client proving the vault IS the note store, and `useVault` already re-renders on
+  // change. Derived rather than mirrored into `notes` state: copying it across in an effect
+  // would add a render pass and a second source of truth for the same list.
+  const exposedNotes: LiveNote[] = CLIENT_PROVING ? (vault.notes as LiveNote[]) : notes;
+
   const refresh = useCallback(() => {
     fetchMarkets()
       .then((d) => {
@@ -131,6 +170,13 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {});
 
+    if (CLIENT_PROVING) {
+      // Nothing to poll until the vault is unlocked -- and unlocking is a wallet prompt, so it
+      // must never be triggered by a background timer.
+      vault.refresh().catch(() => {});
+      return;
+    }
+
     if (!session) {
       // Genuinely nobody signed in -- there are no notes to show.
       setNotes([]);
@@ -142,6 +188,10 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     fetchNotes()
       .then((d) => setNotes(d.notes))
       .catch(() => {});
+    // `vault.refresh` is stable across renders (useCallback on a ref-held vault), so it does
+    // not belong in the dep array -- including it would re-create the poll interval whenever
+    // the note list changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   useEffect(() => {
@@ -207,6 +257,25 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /**
+   * Turns worker/download callbacks into the same `step` text the server path used, so the
+   * activity overlay needs no knowledge of which prover ran.
+   */
+  function proveOptions(step: (s: string) => void, what: string) {
+    return {
+      onProgress: (p: FetchProgress) => {
+        if (p.cached) return;
+        setActivity((a) => (a ? { ...a, download: { loaded: p.loaded, total: p.total } } : a));
+        const pct = p.total ? Math.round((p.loaded / p.total) * 100) : 0;
+        step(`Downloading the ${what} circuit (${pct}%) — cached after this`);
+      },
+      onProvingStart: () => {
+        setActivity((a) => (a ? { ...a, download: undefined } : a));
+        step(`Proving ${what} in your browser`);
+      },
+    };
+  }
+
   const faucet = useCallback(
     async (units: number) =>
       run("deposit", undefined, async (step) => {
@@ -237,7 +306,13 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         if (!address) throw new Error("connect your wallet first");
 
         step(`Proving deposit (${config.circuits.deposit.constraints.toLocaleString()} constraints)`);
-        const prepared = await prepareDeposit(units);
+        const prepared = CLIENT_PROVING
+          ? await clientActions.prepareDeposit(
+              await vault.context(),
+              units,
+              proveOptions(step, "deposit"),
+            )
+          : await prepareDeposit(units);
 
         const raw = BigInt(prepared.units) * BigInt(config.poolState.denomination);
         const balance = (await publicClient.readContract({
@@ -297,7 +372,11 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         step("Waiting for confirmation");
         const rc = await publicClient.waitForTransactionReceipt({ hash });
         if (rc.status !== "success") throw new Error("the deposit transaction reverted");
-        await confirmDeposit(prepared.id, hash);
+        if (CLIENT_PROVING) {
+          await clientActions.confirmDeposit(await vault.context(), prepared.id, hash);
+        } else {
+          await confirmDeposit(prepared.id, hash);
+        }
         pushReceipt({
           kind: "deposit",
           txHash: hash,
@@ -332,7 +411,9 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             ? `Proving the bet (${config.circuits.bet.constraints.toLocaleString()} constraints), then relaying`
             : "Proving the bet, then relaying",
         );
-        const r = await doBet(noteId, marketId, side);
+        const r = CLIENT_PROVING
+          ? await clientActions.bet(await vault.context(), noteId, marketId, side, proveOptions(step, "the bet"))
+          : await doBet(noteId, marketId, side);
         relayed("bet", r, `${side.toUpperCase()} position sealed. Your address is not on this transaction.`, r.id, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -347,7 +428,16 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             ? `Proving the redemption (${config.circuits.redeem.constraints.toLocaleString()} constraints), then relaying`
             : "Proving the redemption, then relaying",
         );
-        const r = await doRedeem(noteId);
+        let r;
+        if (CLIENT_PROVING) {
+          // The circuit's divisors must be the SETTLED totals, and the contract pins them --
+          // so they are read fresh here rather than taken from the polled market list, which
+          // can be up to POLL_MS stale and would prove against numbers the contract rejects.
+          const { market } = await fetchMarket(Number(exposedNotes.find((n) => n.id === noteId)?.marketId ?? 0));
+          r = await clientActions.redeem(await vault.context(), noteId, market, proveOptions(step, "the redemption"));
+        } else {
+          r = await doRedeem(noteId);
+        }
         relayed("redeem", r, `Paid into a shielded note of ${r.payout} units. No collateral moved.`, r.id, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -362,7 +452,35 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             ? `Proving the withdrawal (${config.circuits.withdraw.constraints.toLocaleString()} constraints), then relaying`
             : "Proving the withdrawal, then relaying",
         );
-        const r = await doWithdraw(noteId, amount, recipient);
+        let r;
+        if (CLIENT_PROVING) {
+          if (!config) throw new Error("config not loaded");
+          // Rung occupancy and the floor both move, so both are read live -- the server path
+          // reads them inside its action for the same reason.
+          const [atRung, minAnonymitySet] = (await Promise.all([
+            publicClient.readContract({
+              address: config.pool,
+              abi: config.poolAbi as never,
+              functionName: "depositsAtDenomination",
+              args: [BigInt(amount)],
+            }),
+            publicClient.readContract({
+              address: config.pool,
+              abi: config.poolAbi as never,
+              functionName: "minAnonymitySet",
+            }),
+          ])) as [bigint, bigint];
+          r = await clientActions.withdraw(
+            await vault.context(),
+            noteId,
+            amount,
+            recipient,
+            { atRung, minAnonymitySet },
+            proveOptions(step, "the withdrawal"),
+          );
+        } else {
+          r = await doWithdraw(noteId, amount, recipient);
+        }
         relayed("withdraw", r, `${amount} units sent to ${r.recipient}.`, r.changeId ?? undefined, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -374,13 +492,15 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       config,
       markets,
       pool,
-      notes,
+      notes: exposedNotes,
       activity,
       receipt,
       receiptHistory,
       error,
       walletUnits,
       getOddsHistory: (marketId: number) => oddsHistoryRef.current.get(marketId) ?? [],
+      clientProving: CLIENT_PROVING,
+      vaultUnlocked: vault.unlocked,
       refresh,
       dismissReceipt: () => setReceipt(null),
       clearError: () => setError(null),
@@ -390,7 +510,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       redeem,
       withdraw,
     }),
-    [config, markets, pool, notes, activity, receipt, receiptHistory, error, walletUnits, refresh, deposit, faucet, bet, redeem, withdraw],
+    [config, markets, pool, exposedNotes, activity, receipt, receiptHistory, error, walletUnits, vault.unlocked, refresh, deposit, faucet, bet, redeem, withdraw],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

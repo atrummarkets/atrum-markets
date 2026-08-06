@@ -43,6 +43,15 @@ interface WalletValue {
    */
   walletClient: () => Promise<WalletClient>;
   publicClient: PublicClient;
+  /**
+   * Sign arbitrary text with the connected wallet.
+   *
+   * Exposed separately from `connect`'s sign-in because the note vault derives its spending
+   * keys from a signature that must NEVER reach the server (lib/atrum/client/vault.ts), while
+   * sign-in's signature is sent to the server by definition. Same primitive, opposite
+   * handling, so the caller has to pick deliberately.
+   */
+  signMessage: (message: string) => Promise<string>;
 }
 
 const WalletContext = createContext<WalletValue | null>(null);
@@ -216,6 +225,14 @@ function WalletBridge({ children }: { children: ReactNode }) {
     return client as WalletClient;
   }, [config]);
 
+  const signMessage = useCallback(
+    async (message: string): Promise<string> => {
+      if (!address) throw new Error("connect your wallet first");
+      return signMessageAsync({ message, account: address });
+    },
+    [signMessageAsync, address],
+  );
+
   const value: WalletValue = {
     address,
     session,
@@ -227,6 +244,7 @@ function WalletBridge({ children }: { children: ReactNode }) {
     switchChain,
     walletClient,
     publicClient,
+    signMessage,
   };
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

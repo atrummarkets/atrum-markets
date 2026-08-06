@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/stage-circuits.mjs && next dev",
+    "prebuild": "node scripts/stage-circuits.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:client": "node scripts/stage-circuits.mjs && node --experimental-strip-types --import ./test/setup.mjs test/client-proving.test.mjs",
     "db:migrate": "node --env-file-if-exists=.env.local db/migrate.mjs"
   },
   "dependencies": {
