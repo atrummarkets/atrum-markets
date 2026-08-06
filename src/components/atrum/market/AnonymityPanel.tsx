@@ -1,42 +1,42 @@
+"use client";
+
 import { color, font, motion } from "@/lib/atrum/theme";
+import { useDetailMode } from "@/lib/atrum/detailMode";
 import type { PoolState } from "@/lib/atrum/api";
+import Detail from "@/components/atrum/ui/Detail";
+import NumberTicker from "@/components/atrum/ui/motion/NumberTicker";
 
 const BATCH_SIZE = 64;
 
 export default function AnonymityPanel({ pool }: { pool: PoolState }) {
+  const { mode } = useDetailMode();
   const ok = pool.anonymityOk;
   // One tick per note up to the batch width. Real counts, no padding.
   const ticks = Array.from({ length: BATCH_SIZE }, (_, i) => i < pool.totalDeposits);
+  const others = Math.max(pool.totalDeposits - 1, 0);
 
   return (
     <div style={{ marginTop: 56, background: color.basalt, border: `1px solid ${color.hairline}`, padding: 40 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 40, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash, marginBottom: 20 }}>
-            Anonymity set
+            {mode === "detailed" ? "Anonymity set" : "Privacy pool"}
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 20 }}>
-            <span
-              style={{
-                fontFamily: font.mono,
-                fontWeight: 300,
-                fontSize: "clamp(44px,7vw,96px)",
-                lineHeight: 0.82,
-                color: ok ? color.ivory : color.ember,
-                transition: `color ${motion.panel}`,
-              }}
-            >
-              {String(pool.totalDeposits).padStart(2, "0")}
+            <NumberTicker
+              value={pool.totalDeposits}
+              format={(n) => String(Math.round(n)).padStart(2, "0")}
+              className={`font-mono font-light leading-[0.82] text-[clamp(44px,7vw,96px)] ${ok ? "text-ivory" : "text-ember"}`}
+              durationMs={700}
+            />
+            <span style={{ fontSize: 18, color: color.pewter, maxWidth: "20ch" }}>
+              {mode === "detailed" ? "notes in the shared pool" : `${others} other position${others === 1 ? "" : "s"} mixed with yours`}
             </span>
-            <span style={{ fontSize: 18, color: color.pewter, maxWidth: "18ch" }}>notes in the shared pool</span>
           </div>
         </div>
         <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash }}>Floor</div>
           <div style={{ fontFamily: font.mono, fontSize: 22, color: color.smoke }}>{pool.minAnonymitySet}</div>
-          <div style={{ fontSize: 13, color: color.ash, maxWidth: "24ch" }}>
-            Below this the pool refuses the bet.
-          </div>
         </div>
       </div>
 
@@ -59,11 +59,16 @@ export default function AnonymityPanel({ pool }: { pool: PoolState }) {
         <span>{BATCH_SIZE} · batch</span>
       </div>
 
-      <p style={{ margin: "28px 0 0", fontSize: 16, color: color.smoke, maxWidth: "70ch" }}>
-        A proof gives you a hiding place; only the crowd gives you someone to hide behind. Notes enter the tree in
-        batches of {BATCH_SIZE}, and a deposit names no market — so every unspent note in the system is part of
-        the set, not just this market&apos;s.
-      </p>
+      <div style={{ marginTop: 28 }}>
+        <Detail summary={mode === "detailed" ? "Why the crowd matters" : "How this works"}>
+          <p style={{ margin: 0, fontSize: 16, color: color.smoke, maxWidth: "70ch" }}>
+            A proof gives you a hiding place; only the crowd gives you someone to hide behind. Notes enter the tree
+            in batches of {BATCH_SIZE}, and a deposit names no market — so every unspent note in the system is
+            part of the set, not just this market&apos;s. Below the floor of {pool.minAnonymitySet}, the pool
+            refuses to bet at all.
+          </p>
+        </Detail>
+      </div>
     </div>
   );
 }

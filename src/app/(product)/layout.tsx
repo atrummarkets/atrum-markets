@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { color, font } from "@/lib/atrum/theme";
 import { WalletProvider } from "@/lib/atrum/wallet";
 import { MarketProvider } from "@/lib/atrum/marketContext";
+import { DetailModeProvider } from "@/lib/atrum/detailMode";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import Header from "@/components/atrum/Header";
 import Footer from "@/components/atrum/Footer";
 import ActivityOverlay from "@/components/atrum/ActivityOverlay";
@@ -16,26 +18,30 @@ export default function ProductLayout({ children }: { children: React.ReactNode 
   return (
     <WalletProvider>
       <MarketProvider>
-        <div
-          style={{
-            minHeight: "100vh",
-            background: color.void,
-            backgroundImage:
-              "radial-gradient(120% 62% at 50% -18%, rgba(240,217,176,0.055) 0%, rgba(240,217,176,0.014) 34%, rgba(6,7,10,0) 66%)",
-            color: color.bone,
-            fontFamily: font.body,
-            fontSize: 17,
-            letterSpacing: "-0.005em",
-            lineHeight: 1.5,
-          }}
-        >
-          <Header />
-          <OnboardingBanner />
-          {children}
-          <Footer />
-        </div>
-        <ActivityOverlay />
-        <ReceiptOverlay />
+        <DetailModeProvider>
+          <TooltipProvider delayDuration={150}>
+            <div
+              style={{
+                minHeight: "100vh",
+                background: color.void,
+                backgroundImage:
+                  "radial-gradient(120% 62% at 50% -18%, rgba(240,217,176,0.055) 0%, rgba(240,217,176,0.014) 34%, rgba(6,7,10,0) 66%)",
+                color: color.bone,
+                fontFamily: font.body,
+                fontSize: 17,
+                letterSpacing: "-0.005em",
+                lineHeight: 1.5,
+              }}
+            >
+              <Header />
+              <OnboardingBanner />
+              {children}
+              <Footer />
+            </div>
+            <ActivityOverlay />
+            <ReceiptOverlay />
+          </TooltipProvider>
+        </DetailModeProvider>
       </MarketProvider>
     </WalletProvider>
   );

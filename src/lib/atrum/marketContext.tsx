@@ -57,7 +57,18 @@ export interface Receipt {
   gasUsed?: string;
   provingMs?: number;
   noteId?: string;
+  /** The note this action consumed, when it's known client-side (bet/redeem/withdraw all take
+   * the spent note's id as an argument) -- lets `/privacy/[noteId]` show "this note was later
+   * spent by ..." for a note whose own creation this session never saw. */
+  spentNoteId?: string;
   detail?: string;
+  /**
+   * `pool.totalDeposits` at the moment this action fired, captured live -- not backfilled
+   * later. There is no way to truthfully state the anonymity set size for an old action after
+   * the fact (only the current count is ever readable from chain), so this is stamped here or
+   * not shown at all. Powers `/privacy/[noteId]`'s "N others were in the set" line.
+   */
+  anonymitySetAtTime: number | null;
 }
 
 interface Value {
@@ -67,6 +78,9 @@ interface Value {
   notes: LiveNote[];
   activity: Activity | null;
   receipt: Receipt | null;
+  /** Every receipt this session produced, oldest first -- `ReceiptOverlay`'s content made
+   * permanent and revisitable instead of one-shot. Powers `/privacy/[noteId]`. */
+  receiptHistory: Receipt[];
   error: string | null;
   /** Collateral balance of the connected wallet, in units (not raw token amount). */
   walletUnits: number | null;
@@ -92,8 +106,10 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   const [walletUnits, setWalletUnits] = useState<number | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [receiptHistory, setReceiptHistory] = useState<Receipt[]>([]);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
+  const poolRef = useRef<PoolState | null>(null);
 
   const refresh = useCallback(() => {
     fetchMarkets()
@@ -118,6 +134,18 @@ export function MarketProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchConfig().then(setConfig).catch((e) => setError(e.message));
+  }, []);
+
+  useEffect(() => {
+    poolRef.current = pool;
+  }, [pool]);
+
+  /** Stamps the live anonymity-set size at the moment of the action, then both shows it (the
+   * transient receipt) and keeps it (the permanent history `/privacy/[noteId]` reads). */
+  const pushReceipt = useCallback((r: Omit<Receipt, "anonymitySetAtTime">) => {
+    const full: Receipt = { ...r, anonymitySetAtTime: poolRef.current?.totalDeposits ?? null };
+    setReceipt(full);
+    setReceiptHistory((prev) => [...prev, full]);
   }, []);
 
   useEffect(() => {
@@ -184,7 +212,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         });
         step("Waiting for confirmation");
         await publicClient.waitForTransactionReceipt({ hash });
-        setReceipt({ kind: "deposit", txHash: hash, detail: `Minted ${units} test ${config.token.symbol}` });
+        pushReceipt({ kind: "deposit", txHash: hash, detail: `Minted ${units} test ${config.token.symbol}` });
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [config, address, walletClient, publicClient, refresh],
@@ -258,7 +286,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         const rc = await publicClient.waitForTransactionReceipt({ hash });
         if (rc.status !== "success") throw new Error("the deposit transaction reverted");
         await confirmDeposit(prepared.id, hash);
-        setReceipt({
+        pushReceipt({
           kind: "deposit",
           txHash: hash,
           provingMs: prepared.provingMs,
@@ -271,14 +299,15 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     [config, address, walletClient, publicClient, refresh],
   );
 
-  function relayed(kind: ActivityKind, r: RelayedResult, detail: string, noteId?: string) {
-    setReceipt({
+  function relayed(kind: ActivityKind, r: RelayedResult, detail: string, noteId?: string, spentNoteId?: string) {
+    pushReceipt({
       kind,
       txHash: r.txHash,
       relayer: r.relayer,
       gasUsed: r.gasUsed,
       provingMs: r.provingMs,
       noteId,
+      spentNoteId,
       detail,
     });
   }
@@ -292,7 +321,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             : "Proving the bet, then relaying",
         );
         const r = await doBet(noteId, marketId, side);
-        relayed("bet", r, `${side.toUpperCase()} position sealed. Your address is not on this transaction.`, r.id);
+        relayed("bet", r, `${side.toUpperCase()} position sealed. Your address is not on this transaction.`, r.id, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [config, refresh],
@@ -307,7 +336,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             : "Proving the redemption, then relaying",
         );
         const r = await doRedeem(noteId);
-        relayed("redeem", r, `Paid into a shielded note of ${r.payout} units. No collateral moved.`, r.id);
+        relayed("redeem", r, `Paid into a shielded note of ${r.payout} units. No collateral moved.`, r.id, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [config, refresh],
@@ -322,7 +351,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             : "Proving the withdrawal, then relaying",
         );
         const r = await doWithdraw(noteId, amount, recipient);
-        relayed("withdraw", r, `${amount} units sent to ${r.recipient}.`, r.changeId ?? undefined);
+        relayed("withdraw", r, `${amount} units sent to ${r.recipient}.`, r.changeId ?? undefined, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [config, refresh],
@@ -336,6 +365,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       notes,
       activity,
       receipt,
+      receiptHistory,
       error,
       walletUnits,
       refresh,
@@ -347,7 +377,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       redeem,
       withdraw,
     }),
-    [config, markets, pool, notes, activity, receipt, error, walletUnits, refresh, deposit, faucet, bet, redeem, withdraw],
+    [config, markets, pool, notes, activity, receipt, receiptHistory, error, walletUnits, refresh, deposit, faucet, bet, redeem, withdraw],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

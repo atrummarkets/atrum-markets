@@ -2,15 +2,15 @@ import Link from "next/link";
 import BootOverlay from "@/components/BootOverlay";
 import Logo from "@/components/atrum/Logo";
 import { color, font } from "@/lib/atrum/theme";
+import Spotlight from "@/components/atrum/ui/motion/Spotlight";
 
 export default function Home() {
   return (
     <div
       style={{
+        position: "relative",
         minHeight: "100vh",
         background: color.void,
-        backgroundImage:
-          "radial-gradient(120% 62% at 50% -18%, rgba(240,217,176,0.055) 0%, rgba(240,217,176,0.014) 34%, rgba(6,7,10,0) 66%)",
         color: color.bone,
         display: "flex",
         alignItems: "center",
@@ -18,12 +18,16 @@ export default function Home() {
         padding: 64,
       }}
     >
+      {/* Ambient breathing, not a reveal -- the door-opening below is this page's one reveal, this
+          just replaces what used to be a static radial gradient with a slowly living one. */}
+      <Spotlight />
+
       <BootOverlay />
 
       {/* The doors opening are this page's one reveal — no second entrance animation stacked on top. */}
-      <div style={{ textAlign: "center", maxWidth: 640 }}>
+      <div style={{ position: "relative", textAlign: "center", maxWidth: 640 }}>
         <div style={{ marginBottom: 32 }}>
-          <Logo size={30} tint={color.ash} />
+          <Logo size={30} />
         </div>
         <h1
           style={{

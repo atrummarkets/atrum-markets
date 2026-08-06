@@ -5,7 +5,11 @@ import Link from "next/link";
 import { color, font, motion } from "@/lib/atrum/theme";
 import { useMarket } from "@/lib/atrum/marketContext";
 import { useWallet } from "@/lib/atrum/wallet";
+import { useDetailMode } from "@/lib/atrum/detailMode";
 import type { LiveMarket, LiveNote } from "@/lib/atrum/api";
+import PillButton from "@/components/atrum/ui/PillButton";
+import StatRow from "@/components/atrum/ui/StatRow";
+import Detail from "@/components/atrum/ui/Detail";
 
 type Side = "yes" | "no";
 
@@ -20,6 +24,7 @@ export default function BetTicket({
 }) {
   const { pool, config, bet, activity, error, clearError } = useMarket();
   const { connect, connecting } = useWallet();
+  const { mode } = useDetailMode();
   const [side, setSide] = useState<Side | null>(null);
   const [noteId, setNoteId] = useState<string | null>(null);
 
@@ -41,14 +46,14 @@ export default function BetTicket({
           {market.phase === "closed"
             ? "The window closed. This market is waiting on the resolver, then on settlement. Positions stay sealed until then."
             : market.settled
-              ? "Winning positions can be redeemed from your notes. Redeeming pays into a shielded note; withdrawing is a separate step."
-              : "The outcome is recorded. Totals are published in the settlement transaction, and redemption opens after that."}
+              ? "Winning positions can be claimed from your portfolio. Claiming pays into a new balance; sending it out is a separate step."
+              : "The outcome is recorded. Totals are published in the settlement transaction, and claiming opens after that."}
         </p>
         <Link
-          href="/notes"
+          href="/portfolio"
           style={{ display: "block", padding: 18, border: `1px solid ${color.hairlineStrong}`, color: color.bone, borderRadius: 2, textAlign: "center", textDecoration: "none", fontSize: 15 }}
         >
-          Go to your notes
+          Go to your portfolio
         </Link>
       </div>
     );
@@ -59,10 +64,10 @@ export default function BetTicket({
       <div>
         {label("Take a position")}
         <div style={{ fontFamily: font.display, fontSize: 34, lineHeight: 1.05, color: color.ivory, marginBottom: 20 }}>
-          Connect to bet.
+          Connect to trade.
         </div>
         <p style={{ margin: "0 0 28px", fontSize: 16, color: color.pewter }}>
-          You will sign a message so we can hand back your notes. It is not a transaction and costs nothing.
+          You will sign a message so we can hand back your balance. It is not a transaction and costs nothing.
         </p>
         <button
           onClick={() => connect()}
@@ -91,10 +96,10 @@ export default function BetTicket({
           {shortBy > 0 && ` ${shortBy} more deposit${shortBy === 1 ? "" : "s"} and the floor is met.`}
         </p>
         <Link
-          href="/boundary"
+          href="/wallet"
           style={{ display: "block", padding: 18, border: `1px solid ${color.hairlineStrong}`, color: color.bone, borderRadius: 2, textAlign: "center", textDecoration: "none", fontSize: 15 }}
         >
-          Deposit — join the pool
+          Add funds — join the pool
         </Link>
       </div>
     );
@@ -108,14 +113,13 @@ export default function BetTicket({
           Nothing to stake yet.
         </div>
         <p style={{ margin: "0 0 28px", fontSize: 16, color: color.pewter }}>
-          A bet spends one unbet note in full. Deposit collateral, wait for it to be grafted into the tree with the
-          next batch, then come back.
+          A trade uses one balance in full. Add funds, wait a moment for it to join the pool, then come back.
         </p>
         <Link
-          href="/boundary"
+          href="/wallet"
           style={{ display: "block", padding: 18, border: 0, background: color.ivory, color: color.void, borderRadius: 2, textAlign: "center", textDecoration: "none", fontFamily: font.display, fontSize: 20, letterSpacing: "0.14em" }}
         >
-          DEPOSIT
+          ADD FUNDS
         </Link>
         {pool && (
           <p style={{ margin: "16px 0 0", fontSize: 13, color: color.ash }}>
@@ -128,6 +132,7 @@ export default function BetTicket({
 
   const selected = spendable.find((n) => n.id === noteId) ?? null;
   const ready = side !== null && selected !== null && !activity;
+  const amounts = Array.from(new Set(spendable.map((n) => Number(n.units)))).sort((a, b) => a - b);
 
   return (
     <div>
@@ -136,81 +141,77 @@ export default function BetTicket({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {(["yes", "no"] as const).map((s) => {
           const on = side === s;
-          const accent = s === "yes" ? color.ivory : color.ash;
           return (
-            <button
+            <PillButton
               key={s}
+              selected={on}
               onClick={() => setSide(s)}
-              style={{
-                padding: "28px 16px",
-                border: `1px solid ${on ? accent : s === "yes" ? color.hairlineStrong : color.hairline}`,
-                background: on ? accent : "transparent",
-                color: on ? color.void : s === "yes" ? color.ivory : color.smoke,
-                borderRadius: 2,
-                cursor: "pointer",
-                fontFamily: font.display,
-                fontSize: 22,
-                letterSpacing: "0.16em",
-                textAlign: "left",
-                transition,
-              }}
+              className="px-4 py-7 text-left"
+              selectedClassName={s === "yes" ? "bg-ivory text-void border-ivory" : "bg-ash text-void border-ash"}
+              unselectedClassName={s === "yes" ? "bg-transparent text-ivory border-hairlineStrong" : "bg-transparent text-smoke border-hairline"}
             >
-              {s.toUpperCase()}
-              <div style={{ fontFamily: font.mono, fontSize: 13, letterSpacing: 0, marginTop: 6, opacity: 0.75 }}>
+              <span className="block font-display text-[22px] tracking-[0.16em]">{s.toUpperCase()}</span>
+              <span className="block font-mono text-[13px] mt-1.5 opacity-75">
                 {s === "yes" ? market.oddsYesPct : 100 - market.oddsYesPct}%
-              </div>
-            </button>
+              </span>
+            </PillButton>
           );
         })}
       </div>
 
       <div style={{ marginTop: 28, marginBottom: 14, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash }}>
-        Stake one note
+        {mode === "detailed" ? "Stake one note" : "Choose an amount"}
       </div>
-      <div style={{ display: "grid", gap: 8 }}>
-        {spendable.map((n) => {
-          const on = noteId === n.id;
-          return (
-            <button
-              key={n.id}
-              onClick={() => setNoteId(n.id)}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "14px 16px",
-                border: `1px solid ${on ? color.ivory : color.hairline}`,
-                background: on ? "rgba(245,241,232,0.06)" : "transparent",
-                color: on ? color.ivory : color.pewter,
-                borderRadius: 2,
-                cursor: "pointer",
-                transition,
-              }}
-            >
-              <span style={{ fontFamily: font.mono, fontSize: 14 }}>{n.units} units</span>
-              <span style={{ fontFamily: font.mono, fontSize: 12, color: color.ash }}>0x{n.id}</span>
-            </button>
-          );
-        })}
-      </div>
-      <p style={{ margin: "14px 0 0", fontSize: 13, color: color.ash }}>
-        A bet spends the whole note. Amounts are fixed denominations because an unusual amount is a name tag.
-      </p>
 
-      <div style={{ marginTop: 28, borderTop: `1px solid ${color.hairline}` }}>
-        {[
-          ["Stake", selected ? `${selected.units} units` : "—"],
-          ["Gas", "none — relayed for you"],
-          [
-            "Proof",
-            config ? `${config.circuits.bet.constraints.toLocaleString()} constraints` : "—",
-          ],
-        ].map(([k, v]) => (
-          <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "14px 0", borderBottom: `1px solid ${color.hairline}` }}>
-            <span style={{ fontSize: 15, color: color.smoke }}>{k}</span>
-            <span style={{ fontFamily: font.mono, fontSize: 14, color: color.bone }}>{v}</span>
-          </div>
-        ))}
+      {mode === "detailed" ? (
+        <div style={{ display: "grid", gap: 8 }}>
+          {spendable.map((n) => (
+            <PillButton
+              key={n.id}
+              selected={noteId === n.id}
+              onClick={() => setNoteId(n.id)}
+              className="justify-between px-4 py-3.5 flex"
+            >
+              <span className="font-mono text-sm">{n.units} units</span>
+              <span className="font-mono text-xs text-ash">0x{n.id}</span>
+            </PillButton>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${amounts.length},1fr)` }}>
+          {amounts.map((amount) => {
+            const match = spendable.find((n) => Number(n.units) === amount);
+            const isSelected = selected !== null && Number(selected.units) === amount;
+            return (
+              <PillButton
+                key={amount}
+                selected={isSelected}
+                onClick={() => match && setNoteId(match.id)}
+                className="py-4"
+              >
+                {amount}
+              </PillButton>
+            );
+          })}
+        </div>
+      )}
+
+      {mode !== "detailed" && selected && (
+        <p style={{ margin: "10px 0 0", fontSize: 12, color: color.ash, fontFamily: font.mono }}>0x{selected.id}</p>
+      )}
+
+      <div style={{ marginTop: 14 }}>
+        <Detail summary="Why only the whole amount?">
+          <p style={{ margin: 0, fontSize: 13, color: color.ash }}>
+            A bet spends the whole note. Amounts are fixed denominations because an unusual amount is a name tag.
+          </p>
+        </Detail>
+      </div>
+
+      <div style={{ marginTop: 14, borderTop: `1px solid ${color.hairline}` }}>
+        <StatRow label="Stake">{selected ? `${selected.units} units` : "—"}</StatRow>
+        <StatRow label="Gas">none — relayed for you</StatRow>
+        <StatRow label="Proof">{config ? `${config.circuits.bet.constraints.toLocaleString()} constraints` : "—"}</StatRow>
       </div>
 
       {error && (
@@ -243,7 +244,7 @@ export default function BetTicket({
         SEAL
       </button>
       <p style={{ margin: "14px 0 0", fontSize: 13, color: color.ash }}>
-        {side === null ? "Choose a side." : !selected ? "Choose which note to stake." : "Your stake is encrypted before it leaves. Only the total is ever added up."}
+        {side === null ? "Choose a side." : !selected ? "Choose an amount." : "Your stake is encrypted before it leaves. Only the total is ever added up."}
       </p>
     </div>
   );

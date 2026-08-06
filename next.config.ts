@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/atrum/**": ["./circuits-build/**"],
   },
+  async redirects() {
+    return [
+      { source: "/notes", destination: "/portfolio", permanent: false },
+      { source: "/boundary", destination: "/wallet", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

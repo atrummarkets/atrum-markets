@@ -1,53 +1,33 @@
 import Link from "next/link";
-import { color, font } from "@/lib/atrum/theme";
 
-export type LogoVariant = "mark" | "lockup" | "wordmark";
+const ASPECT = 1154 / 357;
 
 interface LogoProps {
-  /** mark: just the glyph. wordmark: just "ATRUM" text. lockup: both, glyph first. */
-  variant?: LogoVariant;
-  /** Basis for sizing -- the glyph's rendered height in px; wordmark size and gap scale from it. */
+  /** Rendered height in px -- width follows the asset's real aspect ratio. */
   size?: number;
   /** Wraps the whole thing in a Link when set. */
   href?: string;
-  tint?: string;
 }
 
 /**
- * The one place the Atrum mark + wordmark are assembled, built from the existing chrome-"A"
- * asset (public/uploads/atrum-logo.png, previously only shown once in BootOverlay) and the
- * existing wordmark font token (theme.ts's font.wordmark) -- no new brand files.
+ * The single Atrum wordmark asset (public/uploads/atrum-wordmark-ivory.png) -- mark and
+ * lettering are one flat-ivory graphic, not assembled from a separate glyph image + CSS text.
  */
-export default function Logo({ variant = "lockup", size = 22, href, tint }: LogoProps) {
+export default function Logo({ size = 22, href }: LogoProps) {
   const content = (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: Math.round(size * 0.4) }}>
-      {variant !== "wordmark" && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src="/uploads/atrum-logo.png"
-          alt={variant === "mark" ? "Atrum" : ""}
-          style={{ height: size, width: "auto", display: "block" }}
-        />
-      )}
-      {variant !== "mark" && (
-        <span
-          style={{
-            fontFamily: font.wordmark,
-            fontWeight: 700,
-            fontSize: Math.round(size * 0.68),
-            letterSpacing: "0.16em",
-            color: tint ?? color.ivory,
-          }}
-        >
-          ATRUM
-        </span>
-      )}
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/uploads/atrum-wordmark-ivory.png"
+      alt="Atrum"
+      style={{ height: size, width: size * ASPECT }}
+    />
   );
 
-  if (!href) return content;
+  if (!href) return <span style={{ display: "inline-flex" }}>{content}</span>;
   return (
-    <Link href={href} style={{ textDecoration: "none" }}>
+    // globals.css puts a border-bottom "underline" on every <a> -- override it here, this is a
+    // logo, not a text link.
+    <Link href={href} style={{ display: "inline-flex", borderBottom: "none" }}>
       {content}
     </Link>
   );

@@ -1,26 +1,40 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AnimatePresence } from "motion/react";
 import { color, font } from "@/lib/atrum/theme";
 import { useMarket } from "@/lib/atrum/marketContext";
 import { useWallet } from "@/lib/atrum/wallet";
+import { useDetailMode } from "@/lib/atrum/detailMode";
 import { txUrl, shortHash } from "@/lib/atrum/format";
 import type { LiveNote } from "@/lib/atrum/api";
 import WithdrawDialog from "@/components/atrum/WithdrawDialog";
+import { useState } from "react";
 
-const COLUMNS = "150px 1fr 130px 150px 180px";
+const COLUMNS = "150px 1fr 130px 150px 200px";
 
-/** Every state a note can be in, derived from real fields -- never invented. */
+/** Every state a note can be in, derived from real fields -- never invented. Two altitudes of
+ * the same derivation: simple plain-English state for a Polymarket-style trader, the exact
+ * protocol state for anyone who's flipped to Detailed. */
 function describe(note: LiveNote, settledMarkets: Set<string>, winners: Set<string>) {
   if (note.status === "spent") {
-    return { state: "SPENT", detail: "Already used. Its nullifier is on chain.", action: null, tone: color.smoke };
+    return {
+      simpleState: "USED",
+      detailedState: "SPENT",
+      simpleDetail: "Already used.",
+      detailedDetail: "Already used. Its nullifier is on chain.",
+      action: null,
+      tone: color.smoke,
+    };
   }
   if (note.status === "queued") {
+    const building = !note.txHash;
     return {
-      state: "QUEUED",
-      detail: note.txHash ? "On chain, waiting for the next batch graft." : "Building — not yet broadcast.",
+      simpleState: "PENDING",
+      detailedState: "QUEUED",
+      simpleDetail: building ? "Getting ready." : "Joining the shared pool — a brief wait.",
+      detailedDetail: building ? "Building — not yet broadcast." : "On chain, waiting for the next batch graft.",
       action: null,
       tone: color.ash,
     };
@@ -28,16 +42,20 @@ function describe(note: LiveNote, settledMarkets: Set<string>, winners: Set<stri
   // grafted
   if (note.outcome === 0) {
     return {
-      state: "COLLATERAL",
-      detail: "In the tree. Can back a bet in any market, or exit.",
+      simpleState: "BALANCE",
+      detailedState: "COLLATERAL",
+      simpleDetail: "Ready to trade with, or send back out.",
+      detailedDetail: "In the tree. Can back a bet in any market, or exit.",
       action: "bet" as const,
       tone: color.pewter,
     };
   }
   if (note.outcome === 3) {
     return {
-      state: "SETTLED",
-      detail: "A payout note. Withdraw whenever you like — later is quieter.",
+      simpleState: "WINNINGS",
+      detailedState: "SETTLED",
+      simpleDetail: "Ready to send to your wallet — later is quieter.",
+      detailedDetail: "A payout note. Withdraw whenever you like — later is quieter.",
       action: "withdraw" as const,
       tone: color.halo,
     };
@@ -45,27 +63,45 @@ function describe(note: LiveNote, settledMarkets: Set<string>, winners: Set<stri
   const side = note.outcome === 1 ? "YES" : "NO";
   if (!settledMarkets.has(note.marketId)) {
     return {
-      state: `${side} · OPEN`,
-      detail: `Sealed in market #${note.marketId}. Nothing about it is public until settlement.`,
+      simpleState: `${side} · PENDING`,
+      simpleDetail: "Waiting on this market to settle.",
+      detailedState: `${side} · OPEN`,
+      detailedDetail: `Sealed in market #${note.marketId}. Nothing about it is public until settlement.`,
       action: null,
       tone: color.ivory,
     };
   }
   if (winners.has(`${note.marketId}:${note.outcome}`)) {
     return {
-      state: `${side} · WON`,
-      detail: "Redeeming pays into a shielded note. No collateral moves.",
+      simpleState: `${side} · WON`,
+      simpleDetail: "Claim it, then send it out whenever you like.",
+      detailedState: `${side} · WON`,
+      detailedDetail: "Redeeming pays into a shielded note. No collateral moves.",
       action: "redeem" as const,
       tone: color.halo,
     };
   }
-  return { state: `${side} · LOST`, detail: `Market #${note.marketId} resolved the other way.`, action: null, tone: color.smoke };
+  return {
+    simpleState: `${side} · LOST`,
+    simpleDetail: "This market went the other way.",
+    detailedState: `${side} · LOST`,
+    detailedDetail: `Market #${note.marketId} resolved the other way.`,
+    action: null,
+    tone: color.smoke,
+  };
 }
 
-export default function NotesPage() {
+const ACTION_LABEL: Record<"bet" | "redeem" | "withdraw", { simple: string; detailed: string }> = {
+  bet: { simple: "Trade", detailed: "bet" },
+  redeem: { simple: "Claim", detailed: "redeem" },
+  withdraw: { simple: "Send", detailed: "withdraw" },
+};
+
+export default function PortfolioPage() {
   const router = useRouter();
   const { notes, markets, activity, error, clearError, redeem } = useMarket();
   const { session, connect, connecting } = useWallet();
+  const { mode } = useDetailMode();
   const [withdrawing, setWithdrawing] = useState<LiveNote | null>(null);
 
   const settledMarkets = new Set(markets.filter((m) => m.settled).map((m) => String(m.marketId)));
@@ -79,10 +115,10 @@ export default function NotesPage() {
     return (
       <main style={{ padding: "96px 64px", maxWidth: 720 }}>
         <h1 style={{ fontFamily: font.display, fontWeight: 400, fontSize: 44, color: color.ivory, margin: "0 0 16px" }}>
-          Your notes
+          Your portfolio
         </h1>
         <p style={{ margin: "0 0 32px", fontSize: 19, color: color.smoke }}>
-          Connect your wallet to see them. You will sign a message to prove the address is yours — no transaction,
+          Connect your wallet to see it. You&apos;ll sign a message to prove the address is yours — no transaction,
           no gas.
         </p>
         <button
@@ -100,18 +136,19 @@ export default function NotesPage() {
     <main style={{ padding: "80px 64px 128px", maxWidth: 1300 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 32, flexWrap: "wrap", marginBottom: 16 }}>
         <h1 style={{ fontFamily: font.display, fontWeight: 400, fontSize: "clamp(30px,3.6vw,46px)", color: color.ivory, margin: 0 }}>
-          Your notes
+          Your portfolio
         </h1>
         <Link
-          href="/boundary"
+          href="/wallet"
           style={{ padding: "14px 28px", border: 0, background: color.ivory, color: color.void, borderRadius: 2, textDecoration: "none", fontSize: 15 }}
         >
-          Deposit
+          Add funds
         </Link>
       </div>
       <p style={{ margin: "0 0 48px", fontSize: 19, color: color.smoke, maxWidth: "62ch" }}>
-        There is no account and no balance. You hold notes — sealed objects with states. Each state permits
-        different things.
+        {mode === "detailed"
+          ? "There is no account and no balance. You hold notes — sealed objects with states. Each state permits different things."
+          : "Your balance and open positions. Each row shows what it's for and what you can do with it."}
       </p>
 
       {error && (
@@ -126,10 +163,10 @@ export default function NotesPage() {
       {notes.length === 0 ? (
         <div style={{ padding: 64, border: `1px solid ${color.hairline}`, textAlign: "center" }}>
           <p style={{ margin: "0 0 24px", fontSize: 17, color: color.smoke }}>
-            No notes yet. Deposit collateral to get your first one.
+            Nothing here yet. Add funds to get started.
           </p>
-          <Link href="/boundary" style={{ color: color.halo, fontSize: 15 }}>
-            Go to the boundary →
+          <Link href="/wallet" style={{ color: color.halo, fontSize: 15 }}>
+            Go to your wallet →
           </Link>
         </div>
       ) : (
@@ -147,16 +184,19 @@ export default function NotesPage() {
               color: color.ash,
             }}
           >
-            <span>Note</span>
+            <span>{mode === "detailed" ? "Note" : "Item"}</span>
             <span>State</span>
             <span>Units</span>
             <span>Transaction</span>
-            <span>Permits</span>
+            <span>Actions</span>
           </div>
 
           {notes.map((n) => {
             const d = describe(n, settledMarkets, winners);
             const busy = activity?.noteId === n.id;
+            const stateLabel = mode === "detailed" ? d.detailedState : d.simpleState;
+            const detailLine = mode === "detailed" ? d.detailedDetail : d.simpleDetail;
+            const actionLabel = d.action ? ACTION_LABEL[d.action][mode === "detailed" ? "detailed" : "simple"] : null;
             return (
               <div
                 key={n.id}
@@ -164,8 +204,8 @@ export default function NotesPage() {
               >
                 <span style={{ fontFamily: font.mono, fontSize: 14, color: color.pewter }}>0x{n.id}</span>
                 <div>
-                  <div style={{ fontFamily: font.display, fontSize: 21, letterSpacing: "0.14em", color: d.tone }}>{d.state}</div>
-                  <div style={{ fontSize: 13, color: color.ash, marginTop: 4 }}>{d.detail}</div>
+                  <div style={{ fontFamily: font.display, fontSize: 21, letterSpacing: "0.14em", color: d.tone }}>{stateLabel}</div>
+                  <div style={{ fontSize: 13, color: color.ash, marginTop: 4 }}>{detailLine}</div>
                 </div>
                 <span style={{ fontFamily: font.mono, fontSize: 14, color: color.bone }}>{n.units}</span>
                 <span style={{ fontFamily: font.mono, fontSize: 12 }}>
@@ -177,7 +217,7 @@ export default function NotesPage() {
                     <span style={{ color: color.iron }}>—</span>
                   )}
                 </span>
-                <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
                   {d.action === null ? (
                     <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.iron }}>—</span>
                   ) : (
@@ -200,9 +240,15 @@ export default function NotesPage() {
                         letterSpacing: "0.16em",
                       }}
                     >
-                      {busy ? "Working…" : d.action}
+                      {busy ? "Working…" : actionLabel}
                     </button>
                   )}
+                  <Link
+                    href={`/privacy/${n.id}`}
+                    style={{ fontSize: 12, color: color.ash, textDecoration: "underline", textDecorationColor: color.hairline }}
+                  >
+                    How this stayed private
+                  </Link>
                 </div>
               </div>
             );
@@ -211,11 +257,13 @@ export default function NotesPage() {
       )}
 
       <p style={{ margin: "28px 0 0", fontSize: 15, color: color.ash, maxWidth: "76ch" }}>
-        Redeem and withdraw are two steps and stay two steps. A parimutuel payout is an odd number set by your
-        stake; paying it straight out would publish a figure that names your position exactly.
+        Claiming and sending stay two separate steps. A payout is an odd number set by your stake; paying it out
+        immediately would publish a figure that names your position exactly.
       </p>
 
-      {withdrawing && <WithdrawDialog note={withdrawing} onClose={() => setWithdrawing(null)} />}
+      <AnimatePresence>
+        {withdrawing && <WithdrawDialog note={withdrawing} onClose={() => setWithdrawing(null)} />}
+      </AnimatePresence>
     </main>
   );
 }
