@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,7 +17,23 @@ export default function Marquee({
   className?: string;
   durationMs?: number;
 }) {
+  const reduce = useReducedMotion();
   if (items.length === 0) return null;
+
+  if (reduce) {
+    return (
+      <div className={cn("overflow-hidden", className)}>
+        <div className="flex w-max items-center gap-12">
+          {items.map((item, i) => (
+            <span key={i} className="whitespace-nowrap">
+              {item}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("overflow-hidden", className)}>
       <motion.div

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 /**
  * Mined from Magic UI's AnimatedList technique. Used only for `/privacy/[noteId]`'s trace, where
@@ -12,26 +12,32 @@ export default function AnimatedList<T>({
   renderItem,
   keyExtractor,
   className,
+  style,
   staggerMs = 90,
 }: {
   items: T[];
   renderItem: (item: T, index: number) => React.ReactNode;
   keyExtractor: (item: T, index: number) => string;
   className?: string;
+  style?: React.CSSProperties;
   staggerMs?: number;
 }) {
+  const reduce = useReducedMotion();
   return (
-    <div className={className}>
-      {items.map((item, i) => (
-        <motion.div
-          key={keyExtractor(item, i)}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.36, delay: (i * staggerMs) / 1000, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {renderItem(item, i)}
-        </motion.div>
-      ))}
+    <div className={className} style={style}>
+      {items.map((item, i) => {
+        const stagger = Math.min(i, 8);
+        return (
+          <motion.div
+            key={keyExtractor(item, i)}
+            initial={reduce ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.36, delay: reduce ? 0 : (stagger * staggerMs) / 1000, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {renderItem(item, i)}
+          </motion.div>
+        );
+      })}
     </div>
   );
 }

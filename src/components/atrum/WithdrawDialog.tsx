@@ -9,6 +9,8 @@ import type { LiveNote } from "@/lib/atrum/api";
 import { Dialog, AtrumDialogContent } from "@/components/atrum/ui/Dialog";
 import { DialogTitle } from "@/components/ui/dialog";
 import PillButton from "@/components/atrum/ui/PillButton";
+import StatRow from "@/components/atrum/ui/StatRow";
+import ShineButton from "@/components/atrum/ui/motion/ShineButton";
 
 /** Powers of ten, matching `Denominations.sol`. The public leg must be a rung. */
 function rungsUpTo(units: number): number[] {
@@ -66,9 +68,12 @@ export default function WithdrawDialog({ note, onClose }: { note: LiveNote; onCl
               </PillButton>
             ))}
           </div>
+          <div style={{ marginBottom: 8 }}>
+            <StatRow label="Note holds">{units} units</StatRow>
+            {change > 0 && <StatRow label="Change back">{change} units (private)</StatRow>}
+          </div>
           <p style={{ margin: "0 0 24px", fontSize: 13, color: color.ash }}>
-            This note holds {units} units. {change > 0 ? `${change} will come back as a private change note.` : "The whole note leaves."} A rung
-            nobody else has used would name you, so the pool refuses those.
+            A rung nobody else has used would name you, so the pool refuses those.
           </p>
 
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: color.ash, marginBottom: 12 }}>
@@ -96,34 +101,27 @@ export default function WithdrawDialog({ note, onClose }: { note: LiveNote; onCl
           )}
 
           <div style={{ display: "flex", gap: 8 }}>
-            <button
+            <PillButton
+              selected={false}
               onClick={onClose}
-              style={{ flex: 1, padding: 18, border: `1px solid ${color.hairline}`, background: "none", color: color.pewter, borderRadius: 2, cursor: "pointer", fontSize: 15 }}
+              unselectedClassName="flex-1 bg-transparent text-pewter border-hairline"
+              className="justify-center py-[18px] text-[15px]"
             >
               Cancel
-            </button>
-            <button
+            </PillButton>
+            <PillButton
+              selected={valid}
+              disabled={!valid}
               onClick={async () => {
                 if (!valid || amount === null) return;
                 await withdraw(note.id, amount, recipient.trim());
                 onClose();
               }}
-              disabled={!valid}
-              style={{
-                flex: 2,
-                padding: 18,
-                border: 0,
-                background: valid ? color.ivory : color.graphite,
-                color: valid ? color.void : color.ash,
-                borderRadius: 2,
-                cursor: valid ? "pointer" : "not-allowed",
-                fontFamily: font.display,
-                fontSize: 18,
-                letterSpacing: "0.14em",
-              }}
+              className="relative flex-[2] justify-center overflow-hidden py-[18px] font-display text-[18px] tracking-[0.14em]"
             >
+              <ShineButton active={valid} />
               SEND
-            </button>
+            </PillButton>
           </div>
         </motion.div>
       </AtrumDialogContent>

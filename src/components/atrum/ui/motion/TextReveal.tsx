@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 /**
  * Mined from Aceternity's "Text Generate Effect" technique (word-by-word blur-in), font and
@@ -16,15 +16,16 @@ export default function TextReveal({
   className?: string;
   staggerMs?: number;
 }) {
+  const reduce = useReducedMotion();
   const words = text.split(" ");
   return (
     <span className={className}>
       {words.map((word, i) => (
         <motion.span
           key={i}
-          initial={{ opacity: 0, filter: "blur(6px)", y: 6 }}
+          initial={reduce ? { opacity: 1, filter: "blur(0px)", y: 0 } : { opacity: 0, filter: "blur(6px)", y: 6 }}
           animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-          transition={{ duration: 0.5, delay: (i * staggerMs) / 1000, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.5, delay: reduce ? 0 : (i * staggerMs) / 1000, ease: [0.16, 1, 0.3, 1] }}
           className="inline-block"
         >
           {word}

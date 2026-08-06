@@ -30,3 +30,20 @@ export const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 export const EXPLORER = "https://testnet.monadexplorer.com";
 export const txUrl = (hash: string) => `${EXPLORER}/tx/${hash}`;
 export const addressUrl = (address: string) => `${EXPLORER}/address/${address}`;
+
+/** Real, aggregate, anonymized pool facts only -- never a specific bet, side, or amount. This
+ * is activity-as-trust-signal, not a logo strip: it's also a live illustration of the
+ * anonymity set actually growing. Shared by the global HeaderTicker and any page-local marquee. */
+export function poolMarqueeItems(pool: {
+  totalDeposits: number;
+  batchCount: number;
+  queuedCount: number;
+  minAnonymitySet: number;
+}): string[] {
+  return [
+    `${pool.totalDeposits} notes in the shared pool`,
+    `${pool.batchCount} batch${pool.batchCount === 1 ? "" : "es"} grafted`,
+    `${pool.queuedCount} queued for the next graft`,
+    `${pool.minAnonymitySet}-note floor per market`,
+  ];
+}

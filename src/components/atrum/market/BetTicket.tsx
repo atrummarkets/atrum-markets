@@ -10,6 +10,7 @@ import type { LiveMarket, LiveNote } from "@/lib/atrum/api";
 import PillButton from "@/components/atrum/ui/PillButton";
 import StatRow from "@/components/atrum/ui/StatRow";
 import Detail from "@/components/atrum/ui/Detail";
+import ShineButton from "@/components/atrum/ui/motion/ShineButton";
 
 type Side = "yes" | "no";
 
@@ -227,6 +228,8 @@ export default function BetTicket({
         onClick={() => selected && side && bet(selected.id, market.marketId, side)}
         disabled={!ready}
         style={{
+          position: "relative",
+          overflow: "hidden",
           marginTop: 28,
           width: "100%",
           padding: 22,
@@ -241,6 +244,7 @@ export default function BetTicket({
           transition,
         }}
       >
+        <ShineButton active={ready} />
         SEAL
       </button>
       <p style={{ margin: "14px 0 0", fontSize: 13, color: color.ash }}>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Logo from "@/components/atrum/Logo";
 import { color, font } from "@/lib/atrum/theme";
+import ShineButton from "@/components/atrum/ui/motion/ShineButton";
 
 /**
  * Standalone on purpose -- NOT under src/app/(product)/, whose layout mounts
@@ -103,6 +104,8 @@ export default function Enter() {
             disabled={pending}
             className="atrum-cta"
             style={{
+              position: "relative",
+              overflow: "hidden",
               padding: "16px 32px",
               border: `1px solid ${color.hairlineStrong}`,
               color: color.bone,
@@ -116,6 +119,7 @@ export default function Enter() {
               opacity: pending ? 0.7 : 1,
             }}
           >
+            <ShineButton active={!pending} />
             {pending ? "Checking…" : "Enter"}
           </button>
         </form>

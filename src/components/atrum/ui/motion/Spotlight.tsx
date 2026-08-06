@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
  * breathes, it never brightens into a highlight.
  */
 export default function Spotlight({ className }: { className?: string }) {
+  const reduce = useReducedMotion();
   return (
     <motion.div
       aria-hidden
@@ -17,9 +18,10 @@ export default function Spotlight({ className }: { className?: string }) {
       style={{
         backgroundImage:
           "radial-gradient(120% 62% at 50% -18%, rgba(240,217,176,0.055) 0%, rgba(240,217,176,0.014) 34%, rgba(6,7,10,0) 66%)",
+        opacity: reduce ? 0.9 : undefined,
       }}
-      animate={{ opacity: [0.85, 1, 0.85] }}
-      transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      animate={reduce ? undefined : { opacity: [0.85, 1, 0.85] }}
+      transition={reduce ? undefined : { duration: 8, repeat: Infinity, ease: "easeInOut" }}
     />
   );
 }

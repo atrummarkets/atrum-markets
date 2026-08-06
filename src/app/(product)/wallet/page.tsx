@@ -9,6 +9,7 @@ import Label from "@/components/atrum/ui/Label";
 import Panel from "@/components/atrum/ui/Panel";
 import PillButton from "@/components/atrum/ui/PillButton";
 import Detail from "@/components/atrum/ui/Detail";
+import ShineButton from "@/components/atrum/ui/motion/ShineButton";
 
 const RUNGS = [1, 10, 100, 1000];
 
@@ -104,6 +105,8 @@ export default function WalletPage() {
                     onClick={() => deposit(units)}
                     disabled={blocked}
                     style={{
+                      position: "relative",
+                      overflow: "hidden",
                       width: "100%",
                       padding: 20,
                       marginTop: 20,
@@ -117,6 +120,7 @@ export default function WalletPage() {
                       letterSpacing: "0.14em",
                     }}
                   >
+                    <ShineButton active={!blocked} />
                     {activity ? "WORKING…" : unknown ? "READING BALANCE…" : short ? `NEED ${units} ${symbol}` : `ADD ${units}`}
                   </button>
                 );
