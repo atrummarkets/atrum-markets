@@ -39,6 +39,7 @@ import {
 } from "../src/lib/atrum/client/vault.ts";
 import * as actions from "../src/lib/atrum/client/actions.ts";
 import { terminateProver } from "../src/lib/atrum/client/prover.ts";
+import { resetTree, mirroredLeafCount, syncTree, pathFor } from "../src/lib/atrum/client/tree.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const BUILD = join(ROOT, "circuits-build");
@@ -130,13 +131,17 @@ function verifyProof(circuit, proof, publicSignals) {
 // ---------------------------------------------------------------------------
 
 function makeServer() {
+  // Module-level mirror in `tree.ts`, so it must be dropped between scenarios or a later
+  // test inherits an earlier one's leaves.
+  resetTree();
   const state = {
     blob: null,
     tree: new MerkleTree(),
     relayed: [],
     /** Set to an Error to make the next relay fail, exercising the rollback path. */
     relayError: null,
-    pathRequests: [],
+    /** Every `?since=` the client asked for. Used to assert it never names a commitment. */
+    leafRequests: [],
   };
 
   onApi(async (url, init) => {
@@ -149,17 +154,14 @@ function makeServer() {
       state.blob = body.blob;
       return Response.json({ ok: true });
     }
-    if (url.startsWith("/api/atrum/path")) {
-      const commitment = BigInt(new URL(url, "http://x").searchParams.get("commitment"));
-      state.pathRequests.push(commitment);
-      const index = state.tree.leaves.findIndex((l) => l === commitment);
-      if (index < 0) return Response.json({ error: "not grafted" }, { status: 400 });
-      const path = state.tree.path(index);
+    if (url.startsWith("/api/atrum/leaves")) {
+      const since = Number(new URL(url, "http://x").searchParams.get("since") ?? "0");
+      state.leafRequests.push(since);
       return Response.json({
-        index,
+        since,
+        total: state.tree.leaves.length,
         root: state.tree.root().toString(),
-        pathElements: path.pathElements.map(String),
-        pathIndices: path.pathIndices.map(String),
+        leaves: state.tree.leaves.slice(since).map(String),
       });
     }
     if (url === "/api/atrum/relay") {
@@ -170,12 +172,6 @@ function makeServer() {
       }
       state.relayed.push(body);
       return Response.json({ hash: `0x${"ab".repeat(32)}`, relayer: "0xrelayer", gasUsed: "123" });
-    }
-    if (url === "/api/atrum/grafted") {
-      const grafted = Object.fromEntries(
-        body.commitments.map((c) => [c, state.tree.leaves.some((l) => l === BigInt(c))]),
-      );
-      return Response.json({ grafted });
     }
     throw new Error(`unexpected request ${init?.method ?? "GET"} ${url}`);
   });
@@ -634,7 +630,7 @@ await test("a second device reproduces the same notes from the signature alone",
   assertEqual(b.secret, a.secret, "the second device derived a different secret");
 });
 
-await test("the path lookup only ever asks about the note being spent", async () => {
+await test("no request ever names the commitment being spent", async () => {
   const server = makeServer();
   const ctx = await makeContext(server);
   const one = await depositInto(server, ctx);
@@ -642,9 +638,72 @@ await test("the path lookup only ever asks about the note being spent", async ()
 
   await actions.bet(ctx, one.id, MARKET, "yes");
 
-  assertEqual(server.pathRequests.length, 1, "more path lookups than spends");
-  assertEqual(server.pathRequests[0], BigInt(one.commitment), "asked about the wrong commitment");
+  // The whole point of serving leaves instead of paths: the server sees only offsets.
+  for (const since of server.leafRequests) {
+    assert(Number.isInteger(since) && since >= 0, `leaf request was not a plain offset: ${since}`);
+  }
+  const everythingAsked = JSON.stringify(server.leafRequests) + JSON.stringify(server.relayed.map((r) => r.args));
+  assert(
+    !everythingAsked.includes(one.commitment),
+    "the spent commitment appeared in a request the client made before relaying",
+  );
   void two;
+});
+
+await test("paths are derived locally and still satisfy the circuit", async () => {
+  const server = makeServer();
+  const ctx = await makeContext(server);
+  const deposited = await depositInto(server, ctx);
+
+  await actions.bet(ctx, deposited.id, MARKET, "yes");
+
+  // The root the proof was built against is the locally computed one, and the bet proof
+  // already verified above -- so the local tree agrees with the sequencer's.
+  assertEqual(server.relayed[0].args[0], server.tree.root(), "local root disagrees with the mirror");
+  assertEqual(mirroredLeafCount(), server.tree.leaves.length, "client mirrored the wrong leaf count");
+});
+
+await test("the mirror re-syncs incrementally rather than refetching everything", async () => {
+  // Driven through syncTree directly rather than through bets: this is about request shape,
+  // and it would otherwise cost two more multi-second proofs to observe.
+  const server = makeServer();
+  server.tree.insert(111n);
+  await syncTree();
+  assertEqual(server.leafRequests.at(-1), 0, "the first sync should start from zero");
+
+  const before = server.leafRequests.length;
+  server.tree.insert(222n);
+  await syncTree();
+
+  const offsets = server.leafRequests.slice(before);
+  assertEqual(offsets.length, 1, "the second sync made more than one request");
+  assertEqual(offsets[0], 1, "the second sync refetched from zero instead of asking for the tail");
+  assertEqual(mirroredLeafCount(), 2, "the mirror lost or duplicated a leaf while syncing");
+});
+
+await test("a shrunken tree triggers a full rebuild, not an append onto a stale prefix", async () => {
+  // The sequencer resets and rebuilds its mirror from chain (its `reset()`). Appending the
+  // rebuilt tree onto the old prefix would serve paths for a tree that never existed, and
+  // every proof built from them would fail verification with no diagnostic.
+  const server = makeServer();
+  server.tree.insert(111n);
+  server.tree.insert(222n);
+  await syncTree();
+  assertEqual(mirroredLeafCount(), 2, "did not mirror both leaves");
+
+  server.tree = new MerkleTree();
+  server.tree.insert(999n);
+  await syncTree();
+
+  assertEqual(mirroredLeafCount(), 1, "the mirror appended onto a stale prefix");
+  const path = await pathFor(999n);
+  assertEqual(path.root, server.tree.root(), "rebuilt mirror disagrees with the sequencer");
+});
+
+await test("pathFor refuses a commitment that has not grafted", async () => {
+  const server = makeServer();
+  server.tree.insert(111n);
+  await assertRejects(() => pathFor(424242n), "not been grafted", "produced a path for a missing leaf");
 });
 
 // --- commitment agreement -------------------------------------------------

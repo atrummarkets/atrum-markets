@@ -22,6 +22,7 @@
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Vault, VAULT_MESSAGE, type VaultNote } from "./vault";
+import { graftedSet } from "./tree";
 import type { ActionContext } from "./actions";
 
 /** A deposit proved but never broadcast. Swept, matching the server path's behaviour. */
@@ -44,18 +45,6 @@ async function saveBlob(blob: string): Promise<void> {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error ?? "could not save your vault");
-}
-
-async function fetchGrafted(commitments: string[]): Promise<Record<string, boolean>> {
-  if (commitments.length === 0) return {};
-  const res = await fetch("/api/atrum/grafted", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ commitments }),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error ?? "could not check graft status");
-  return body.grafted ?? {};
 }
 
 /** The unlocked vault together with the address it belongs to. */
@@ -156,6 +145,10 @@ export function useVault(
    * Mirrors `server/atrum/refresh.ts`. Only writes back when something actually changed --
    * an unconditional save on every 5-second poll would rewrite the blob (and burn a fresh
    * GCM nonce) forever for no reason.
+   *
+   * Membership is checked against the locally mirrored tree, so this poll no longer posts the
+   * user's queued commitments to the server every five seconds -- which was the same
+   * correlation leak `/path` had, just in bulk and on a timer.
    */
   const refresh = useCallback(async () => {
     if (!active) return;
@@ -163,7 +156,7 @@ export function useVault(
     const queued = active.notes.filter((n) => n.status === "queued");
     if (queued.length === 0) return;
 
-    const grafted = await fetchGrafted(queued.map((n) => n.commitment));
+    const grafted = await graftedSet(queued.map((n) => n.commitment));
 
     let changed = false;
     for (const note of queued) {

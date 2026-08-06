@@ -36,6 +36,7 @@ import {
   OUTCOME_YES,
 } from "./crypto";
 import { prove, type ProveOptions } from "./prover";
+import { pathFor } from "./tree";
 import { Vault, type VaultNote } from "./vault";
 import type { CircuitId } from "./artifacts";
 
@@ -57,20 +58,6 @@ export interface RelayOutcome {
 // ---------------------------------------------------------------------------
 // Server calls -- everything here is public data
 // ---------------------------------------------------------------------------
-
-interface MerklePath {
-  index: number;
-  root: string;
-  pathElements: string[];
-  pathIndices: string[];
-}
-
-async function fetchPath(commitment: bigint): Promise<MerklePath> {
-  const res = await fetch(`/api/atrum/path?commitment=${commitment.toString()}`);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error ?? "could not fetch the Merkle path");
-  return body as MerklePath;
-}
 
 async function relay(
   action: "betEncrypted" | "redeemPrivate" | "withdraw",
@@ -216,7 +203,7 @@ export async function bet(
   await init();
 
   const { nullifier: spentNullifier, secret: spentSecret } = await ctx.vault.secretsFor(spent);
-  const path = await fetchPath(BigInt(spent.commitment));
+  const path = await pathFor(BigInt(spent.commitment));
   const outcome = side === "yes" ? 1n : 2n;
   const units = BigInt(spent.units);
 
@@ -338,7 +325,7 @@ export async function redeem(
   const remainder = dividend % winningPool;
 
   const { nullifier: spentNullifier, secret: spentSecret } = await ctx.vault.secretsFor(spent);
-  const path = await fetchPath(BigInt(spent.commitment));
+  const path = await pathFor(BigInt(spent.commitment));
 
   const { index, nullifier: newNullifier, secret: newSecret } = await ctx.vault.allocate();
   const settledCommitment = noteCommitment({
@@ -458,7 +445,7 @@ export async function withdraw(
 
   const change = unitsBig - amountBig;
   const { nullifier: spentNullifier, secret: spentSecret } = await ctx.vault.secretsFor(spent);
-  const path = await fetchPath(BigInt(spent.commitment));
+  const path = await pathFor(BigInt(spent.commitment));
   const unbetExit = spent.outcome === 0;
   const marketIdForCircuit = unbetExit ? 0n : BigInt(spent.marketId);
 

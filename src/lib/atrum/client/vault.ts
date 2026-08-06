@@ -29,8 +29,7 @@
  *
  * WHAT THIS STILL DOES NOT FIX, STATED PLAINLY. The seed is only as private as the browser
  * holding it; this trades a compromised-server problem for a compromised-device one, which is
- * the trade every non-custodial wallet already makes. And `fetchPath` still tells the server
- * which commitment is being spent -- see `actions.ts`.
+ * the trade every non-custodial wallet already makes.
  */
 import { FIELD_SIZE } from "./crypto";
 
