@@ -41,6 +41,16 @@ const STAGES = [
     detailed:
       "A settled note leaves in a fixed denomination, to any address you name, at any hour you choose. Waiting is itself privacy: the longer between redeeming and withdrawing, the less the two look related.",
   },
+  {
+    // This page is candid about every other place trust is relocated rather than removed.
+    // Running a third-party analytics pipeline and not saying so would be the one omission
+    // that makes the rest of it read as marketing.
+    title: "What we measure",
+    simple:
+      "We count how often each step is used. Nothing we record identifies you, and we never record which side you bet or how much.",
+    detailed:
+      "Product analytics runs in your browser and is deliberately anonymous: no wallet address is ever sent, no persistent profile is built, and the events carry no bet direction and no stake or payout amount. Recording either would rebuild off chain exactly the link a relayer exists to break — and because both pool totals are public, a payout alone would invert to the stake behind it. What is sent is a count per step, plus deposit and withdrawal sizes, which are already public on chain.",
+  },
 ] as const;
 
 export default function PrivacyPage() {
