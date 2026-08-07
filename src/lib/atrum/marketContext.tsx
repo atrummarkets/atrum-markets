@@ -342,10 +342,10 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             : "Proving the bet, then relaying",
         );
         const r = await doBet(noteId, marketId, side);
-        posthog.capture("bet_placed", {
-          market_id: marketId,
-          side,
-        });
+        // No `side`. Which way someone bet is the position itself; recording it -- even
+        // anonymously, even next to a market id and a timestamp -- puts the one fact a bet is
+        // supposed to hide into an off-chain store. The count is what the dashboard plots.
+        posthog.capture("bet_placed", { market_id: marketId });
         relayed("bet", r, `${side.toUpperCase()} position sealed. Your address is not on this transaction.`, r.id, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -361,9 +361,10 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             : "Proving the redemption, then relaying",
         );
         const r = await doRedeem(noteId);
-        posthog.capture("winnings_redeemed", {
-          payout_units: Number(r.payout),
-        });
+        // No `payout_units`. Payout is units * totalPool / winningPool and both totals are
+        // public, so the payout inverts to the exact stake -- the amount the ElGamal ciphertext
+        // exists to keep private.
+        posthog.capture("winnings_redeemed");
         relayed("redeem", r, `Paid into a shielded note of ${r.payout} units. No collateral moved.`, r.id, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

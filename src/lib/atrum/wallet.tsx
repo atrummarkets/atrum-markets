@@ -14,7 +14,6 @@ import { getWalletClient } from "@wagmi/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAppKit } from "@reown/appkit/react";
 import { createPublicClient, http, defineChain, type Address, type WalletClient, type PublicClient } from "viem";
-import posthog from "posthog-js";
 
 import { CHAIN_ID, PROJECT_ID, wagmiAdapter } from "./appkit";
 
@@ -84,7 +83,6 @@ function WalletBridge({ children }: { children: ReactNode }) {
   // request.
   const pendingAuth = useRef(false);
   const authenticating = useRef(false);
-  const identifiedSession = useRef<Address | null>(null);
 
   const address = (wagmiAddress as Address | undefined) ?? null;
   const chainOk = chainId === CHAIN_ID;
@@ -108,11 +106,19 @@ function WalletBridge({ children }: { children: ReactNode }) {
   const session =
     serverSession && address && serverSession.toLowerCase() === address.toLowerCase() ? serverSession : null;
 
-  useEffect(() => {
-    if (!session || identifiedSession.current?.toLowerCase() === session.toLowerCase()) return;
-    posthog.identify(session);
-    identifiedSession.current = session;
-  }, [session]);
+  /*
+   * DO NOT call posthog.identify() with this address.
+   *
+   * It is the one value this product exists to keep away from a user's activity. Identifying on
+   * it would write "wallet 0xABC bet YES on market 55" into a third-party analytics store in
+   * plain text -- the exact link the relayer exists to break, reconstructed off-chain and made
+   * queryable. `winnings_redeemed`'s payout also inverts to the exact stake, because both pool
+   * totals are public: stake = payout * winningPool / totalPool.
+   *
+   * Analytics here stays anonymous. Funnels and volumes do not need identities, and
+   * `person_profiles: "never"` in instrumentation-client.ts stops a persistent profile being
+   * stitched together from one browser's journey either.
+   */
 
   // The cookie and the wallet connection have independent lifetimes: the cookie outlives the
   // browser session, the wallet connection does not have to. Left unreconciled the app believes
@@ -128,8 +134,6 @@ function WalletBridge({ children }: { children: ReactNode }) {
       .catch(() => {})
       .finally(() => {
         if (cancelled) return;
-        posthog.reset();
-        identifiedSession.current = null;
         setServerSession(null);
       });
     return () => {
@@ -217,8 +221,6 @@ function WalletBridge({ children }: { children: ReactNode }) {
   // letting the user choose.
   const disconnect = useCallback(async () => {
     await fetch("/api/atrum/auth/signout", { method: "POST" }).catch(() => {});
-    posthog.reset();
-    identifiedSession.current = null;
     setServerSession(null);
     await disconnectAsync().catch(() => {});
   }, [disconnectAsync]);
