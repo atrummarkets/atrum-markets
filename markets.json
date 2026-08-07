@@ -233,6 +233,17 @@
       "bettingCloseTime": 1786064669,
       "resolutionStartTime": 1786064969,
       "createdAt": 1786061969
+    },
+    {
+      "id": 56,
+      "question": "[NO-DEPLOY TEST] Created without a git push",
+      "category": "Monad",
+      "resolverType": "manual",
+      "vault": "0x874079970f8ecA56cdd366Ff7eCea5E72a01fdea",
+      "resolver": "0x364EDC06254874e62FF4AD8fA4d9a45238cb5609",
+      "bettingCloseTime": 1786084641,
+      "resolutionStartTime": 1786084941,
+      "createdAt": 1786082841
     }
   ]
 }
