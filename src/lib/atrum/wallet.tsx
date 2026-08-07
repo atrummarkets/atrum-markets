@@ -14,6 +14,7 @@ import { getWalletClient } from "@wagmi/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAppKit } from "@reown/appkit/react";
 import { createPublicClient, http, defineChain, type Address, type WalletClient, type PublicClient } from "viem";
+import posthog from "posthog-js";
 
 import { CHAIN_ID, PROJECT_ID, wagmiAdapter } from "./appkit";
 
@@ -83,6 +84,7 @@ function WalletBridge({ children }: { children: ReactNode }) {
   // request.
   const pendingAuth = useRef(false);
   const authenticating = useRef(false);
+  const identifiedSession = useRef<Address | null>(null);
 
   const address = (wagmiAddress as Address | undefined) ?? null;
   const chainOk = chainId === CHAIN_ID;
@@ -106,6 +108,12 @@ function WalletBridge({ children }: { children: ReactNode }) {
   const session =
     serverSession && address && serverSession.toLowerCase() === address.toLowerCase() ? serverSession : null;
 
+  useEffect(() => {
+    if (!session || identifiedSession.current?.toLowerCase() === session.toLowerCase()) return;
+    posthog.identify(session);
+    identifiedSession.current = session;
+  }, [session]);
+
   // The cookie and the wallet connection have independent lifetimes: the cookie outlives the
   // browser session, the wallet connection does not have to. Left unreconciled the app believes
   // it is signed in with no wallet behind it -- which surfaced as a "switch to Monad testnet"
@@ -119,7 +127,10 @@ function WalletBridge({ children }: { children: ReactNode }) {
     fetch("/api/atrum/auth/signout", { method: "POST" })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) setServerSession(null);
+        if (cancelled) return;
+        posthog.reset();
+        identifiedSession.current = null;
+        setServerSession(null);
       });
     return () => {
       cancelled = true;
@@ -206,6 +217,8 @@ function WalletBridge({ children }: { children: ReactNode }) {
   // letting the user choose.
   const disconnect = useCallback(async () => {
     await fetch("/api/atrum/auth/signout", { method: "POST" }).catch(() => {});
+    posthog.reset();
+    identifiedSession.current = null;
     setServerSession(null);
     await disconnectAsync().catch(() => {});
   }, [disconnectAsync]);

@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { parseAbi } from "viem";
+import posthog from "posthog-js";
 import { useWallet } from "./wallet";
 import {
   fetchConfig,
@@ -224,6 +225,10 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         });
         step("Waiting for confirmation");
         await publicClient.waitForTransactionReceipt({ hash });
+        posthog.capture("test_collateral_minted", {
+          units,
+          token_symbol: config.token.symbol,
+        });
         pushReceipt({ kind: "deposit", txHash: hash, detail: `Minted ${units} test ${config.token.symbol}` });
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -298,6 +303,10 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         const rc = await publicClient.waitForTransactionReceipt({ hash });
         if (rc.status !== "success") throw new Error("the deposit transaction reverted");
         await confirmDeposit(prepared.id, hash);
+        posthog.capture("deposit_completed", {
+          units,
+          token_symbol: config.token.symbol,
+        });
         pushReceipt({
           kind: "deposit",
           txHash: hash,
@@ -333,6 +342,10 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             : "Proving the bet, then relaying",
         );
         const r = await doBet(noteId, marketId, side);
+        posthog.capture("bet_placed", {
+          market_id: marketId,
+          side,
+        });
         relayed("bet", r, `${side.toUpperCase()} position sealed. Your address is not on this transaction.`, r.id, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -348,6 +361,9 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             : "Proving the redemption, then relaying",
         );
         const r = await doRedeem(noteId);
+        posthog.capture("winnings_redeemed", {
+          payout_units: Number(r.payout),
+        });
         relayed("redeem", r, `Paid into a shielded note of ${r.payout} units. No collateral moved.`, r.id, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -363,6 +379,10 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             : "Proving the withdrawal, then relaying",
         );
         const r = await doWithdraw(noteId, amount, recipient);
+        posthog.capture("withdrawal_completed", {
+          amount_units: amount,
+          change_created: r.changeId !== null,
+        });
         relayed("withdraw", r, `${amount} units sent to ${r.recipient}.`, r.changeId ?? undefined, noteId);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
