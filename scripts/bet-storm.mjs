@@ -233,10 +233,35 @@ async function main() {
   });
   const fundHashes = await Promise.all(
     accounts.map((acc, i) =>
-      operator.sendTransaction({ to: acc.address, value: parseEther(FUND_MON), nonce: startNonce + i }),
+      operator.sendTransaction({
+        to: acc.address,
+        value: parseEther(FUND_MON),
+        nonce: startNonce + i,
+        // Declared, never estimated. A plain value transfer sent without an explicit gas limit
+        // REVERTS on Monad -- the receipt says `reverted`, no funds move, and both RPCs agree
+        // the transfer simply did not happen. Observed repeatedly: it is what made 5 of 6
+        // wallets fail "funding never became visible" on two separate runs, which looks like
+        // RPC read-lag and is not. Same undershooting-estimate failure documented for deposits.
+        gas: 21_000n,
+      }),
     ),
   );
-  await Promise.all(fundHashes.map((h) => publicClient.waitForTransactionReceipt({ hash: h })));
+
+  // Confirm each funding transfer actually SUCCEEDED. `waitForTransactionReceipt` resolves for
+  // a reverted transaction too, so awaiting it without checking `status` is what let silent
+  // funding failures surface much later as an unrelated-looking mint error.
+  const fundReceipts = await Promise.all(
+    fundHashes.map((h) => publicClient.waitForTransactionReceipt({ hash: h })),
+  );
+  const reverted = fundReceipts
+    .map((r, i) => (r.status === "success" ? null : i))
+    .filter((i) => i !== null);
+  if (reverted.length > 0) {
+    throw new Error(
+      `funding reverted for wallet(s) ${reverted.join(", ")} -- keys are saved at ${KEYS_PATH}, ` +
+        "top them up and re-run scripts/bet-storm-resume.mjs rather than generating new wallets",
+    );
+  }
   accounts.forEach((acc, i) => log(i, acc.address, `funded ${FUND_MON} MON`));
 
   const results = await Promise.allSettled(

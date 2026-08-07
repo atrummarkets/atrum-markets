@@ -222,6 +222,17 @@
         "windowSeconds": 600,
         "greaterThan": true
       }
+    },
+    {
+      "id": 55,
+      "question": "[LIVE TEST] Will you be able to bet on this?",
+      "category": "Monad",
+      "resolverType": "manual",
+      "vault": "0x9F91f8e37C66Cd3274dbdcDbFd216923b39719cF",
+      "resolver": "0x364EDC06254874e62FF4AD8fA4d9a45238cb5609",
+      "bettingCloseTime": 1786064669,
+      "resolutionStartTime": 1786064969,
+      "createdAt": 1786061969
     }
   ]
 }
