@@ -77,9 +77,20 @@ function fromRow(r: MarketRow): RegistryMarket {
  * live one without complaint.
  */
 export async function loadRegistry(): Promise<Registry> {
-  const { rows } = await db().query<MarketRow>(`${SELECT} ORDER BY id`, [POOL_ADDRESS]);
+  let rows: MarketRow[];
+  try {
+    ({ rows } = await db().query<MarketRow>(`${SELECT} ORDER BY id`, [POOL_ADDRESS]));
+  } catch (error) {
+    // An UNMIGRATED database throws `relation "markets" does not exist` (42P01) -- it does not
+    // return zero rows. Treating only the empty case as "fall back to the file" would mean a
+    // deploy that reaches a database without this table serves NO markets at all rather than
+    // the ones it already had. That is the single worst failure this change could introduce,
+    // and it is one forgotten migration away, so the error path falls back too.
+    console.error(`markets table unreadable, falling back to markets.json: ${(error as Error).message}`);
+    return loadFileRegistry();
+  }
 
-  // An empty table falls back to the file, which keeps local dev working without a migrated
+  // An empty table falls back as well, which keeps local dev working without a migrated
   // database and makes the import safe to run in either order. Deliberately all-or-nothing:
   // merging the two sources would make "where did this market come from?" unanswerable, and a
   // half-imported registry would look identical to a complete one.
@@ -98,7 +109,16 @@ export function loadFileRegistry(): Registry {
 }
 
 export async function registryMarket(id: number): Promise<RegistryMarket | undefined> {
-  const { rows } = await db().query<MarketRow>(`${SELECT} AND id = $2`, [POOL_ADDRESS, id]);
+  let rows: MarketRow[];
+  try {
+    ({ rows } = await db().query<MarketRow>(`${SELECT} AND id = $2`, [POOL_ADDRESS, id]));
+  } catch (error) {
+    // Same reasoning as loadRegistry: an unmigrated database must degrade to the file, not to
+    // "no such market" -- which resolve, settle and every market page would surface as the
+    // market having vanished.
+    console.error(`markets table unreadable, falling back to markets.json: ${(error as Error).message}`);
+    return loadFileRegistry().markets.find((m) => m.id === id);
+  }
   if (rows.length === 0) return loadFileRegistry().markets.find((m) => m.id === id);
   return fromRow(rows[0]);
 }
