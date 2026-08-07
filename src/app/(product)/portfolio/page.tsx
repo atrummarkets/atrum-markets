@@ -8,7 +8,7 @@ import { useMarket } from "@/lib/atrum/marketContext";
 import { useWallet } from "@/lib/atrum/wallet";
 import { useDetailMode } from "@/lib/atrum/detailMode";
 import { txUrl, shortHash } from "@/lib/atrum/format";
-import type { LiveNote } from "@/lib/atrum/api";
+import type { LiveNote, LiveMarket } from "@/lib/atrum/api";
 import WithdrawDialog from "@/components/atrum/WithdrawDialog";
 import AnimatedList from "@/components/atrum/ui/motion/AnimatedList";
 import NumberTicker from "@/components/atrum/ui/motion/NumberTicker";
@@ -16,10 +16,36 @@ import { useState } from "react";
 
 const COLUMNS = "150px 1fr 130px 150px 200px";
 
+/**
+ * What a winning note actually pays.
+ *
+ * WHY THIS IS ON SCREEN. A won position holds its STAKE until it is redeemed -- a 10-unit bet
+ * shows "10" whether it doubled or tripled -- so the row read "you won" next to the number 10
+ * and the natural conclusion was "I won and got 10 back". The payout was only discoverable by
+ * committing to the redeem. Someone hit exactly that confusion on a 3.26x win.
+ *
+ * `units * totalPool / winningPool`, truncated DOWN, is the same arithmetic
+ * `redeem_private.circom` constrains (`units * totalPool == payout * winningPool + remainder`).
+ * BigInt, not floats: this must agree with the circuit exactly or the number shown is a lie.
+ * Truncating down is what keeps the sum of all payouts strictly under the pool.
+ */
+function winningPayout(note: LiveNote, market: LiveMarket | undefined): bigint | null {
+  if (!market?.settled) return null;
+  const totalPool = BigInt(market.yesUnits + market.noUnits);
+  const winningPool = BigInt(note.outcome === 1 ? market.yesUnits : market.noUnits);
+  if (winningPool === 0n) return null;
+  return (BigInt(note.units) * totalPool) / winningPool;
+}
+
 /** Every state a note can be in, derived from real fields -- never invented. Two altitudes of
  * the same derivation: simple plain-English state for a Polymarket-style trader, the exact
  * protocol state for anyone who's flipped to Detailed. */
-function describe(note: LiveNote, settledMarkets: Set<string>, winners: Set<string>) {
+function describe(
+  note: LiveNote,
+  settledMarkets: Set<string>,
+  winners: Set<string>,
+  payout: bigint | null,
+) {
   if (note.status === "spent") {
     return {
       simpleState: "USED",
@@ -74,11 +100,16 @@ function describe(note: LiveNote, settledMarkets: Set<string>, winners: Set<stri
     };
   }
   if (winners.has(`${note.marketId}:${note.outcome}`)) {
+    // State the payout in both altitudes. The stake is what the row shows in Units, and
+    // leaving the reader to infer their winnings from it is how a 3.26x win reads as a
+    // break-even.
+    const worth = payout === null ? "" : ` Worth ${payout} units.`;
     return {
       simpleState: `${side} · WON`,
-      simpleDetail: "Claim it, then send it out whenever you like.",
+      simpleDetail: `Claim it, then send it out whenever you like.${worth}`,
       detailedState: `${side} · WON`,
-      detailedDetail: "Redeeming pays into a shielded note. No collateral moves.",
+      detailedDetail:
+        `Redeeming pays into a shielded note of ${payout ?? "?"} units. No collateral moves.`,
       action: "redeem" as const,
       tone: color.halo,
     };
@@ -199,7 +230,11 @@ export default function PortfolioPage() {
             keyExtractor={(n) => n.id}
             staggerMs={40}
             renderItem={(n, i) => {
-              const d = describe(n, settledMarkets, winners);
+              const payout = winningPayout(n, markets.find((m) => String(m.marketId) === n.marketId));
+              const d = describe(n, settledMarkets, winners, payout);
+              // Only worth showing when redeeming actually changes the number -- a market with
+              // no losers pays 1:1, and "10 -> 10" is noise dressed up as information.
+              const showPayout = d.action === "redeem" && payout !== null && payout !== BigInt(n.units);
               const busy = activity?.noteId === n.id;
               const stateLabel = mode === "detailed" ? d.detailedState : d.simpleState;
               const detailLine = mode === "detailed" ? d.detailedDetail : d.simpleDetail;
@@ -214,11 +249,21 @@ export default function PortfolioPage() {
                     <div style={{ fontFamily: font.display, fontSize: 21, letterSpacing: "0.14em", color: d.tone }}>{stateLabel}</div>
                     <div style={{ fontSize: 13, color: color.ash, marginTop: 4 }}>{detailLine}</div>
                   </div>
-                  <NumberTicker
-                    value={Number(n.units)}
-                    className="font-mono text-sm text-bone"
-                    flashOnChange
-                  />
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                    <NumberTicker
+                      value={Number(n.units)}
+                      className={`font-mono text-sm ${showPayout ? "text-ash line-through" : "text-bone"}`}
+                      flashOnChange
+                    />
+                    {showPayout && (
+                      <span style={{ fontFamily: font.mono, fontSize: 14, color: color.halo }}>
+                        {String(payout)}
+                        <span style={{ fontSize: 11, color: color.ash, marginLeft: 5 }}>
+                          {(Number(payout) / Number(n.units)).toFixed(2)}x
+                        </span>
+                      </span>
+                    )}
+                  </div>
                   <span style={{ fontFamily: font.mono, fontSize: 12 }}>
                     {n.txHash ? (
                       <a href={txUrl(n.txHash)} target="_blank" rel="noreferrer" style={{ color: color.ash, textDecoration: "none" }}>
