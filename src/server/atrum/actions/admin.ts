@@ -18,8 +18,8 @@ import { registryMarket } from "../registry";
 
 const DECRYPT_BOUND = 10_000_000n;
 
-function vaultFor(marketId: number): `0x${string}` {
-  const entry = registryMarket(marketId);
+async function vaultFor(marketId: number): Promise<`0x${string}`> {
+  const entry = await registryMarket(marketId);
   if (!entry) throw new Error(`market ${marketId} is not in the registry`);
   return entry.vault as `0x${string}`;
 }
@@ -31,7 +31,7 @@ function vaultFor(marketId: number): `0x${string}` {
  * comparison against a signed price and no address can decide it.
  */
 export async function resolveMarket(marketId: number, side: "YES" | "NO"): Promise<{ txHash: string }> {
-  const vault = vaultFor(marketId);
+  const vault = await vaultFor(marketId);
 
   const [current, resolutionStartTime] = await Promise.all([
     publicClient.readContract({ address: vault, abi: VAULT_ABI, functionName: "outcome" }),
@@ -64,7 +64,7 @@ export async function resolveMarket(marketId: number, side: "YES" | "NO"): Promi
 export async function settleMarket(
   marketId: number,
 ): Promise<{ txHash: string; yes: string; no: string }> {
-  const vault = vaultFor(marketId);
+  const vault = await vaultFor(marketId);
   const outcome = await publicClient.readContract({ address: vault, abi: VAULT_ABI, functionName: "outcome" });
   if (Number(outcome) === 0) throw new Error(`market ${marketId} has not been resolved yet`);
 
