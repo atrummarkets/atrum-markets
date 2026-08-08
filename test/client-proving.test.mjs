@@ -706,6 +706,107 @@ await test("pathFor refuses a commitment that has not grafted", async () => {
   await assertRejects(() => pathFor(424242n), "not been grafted", "produced a path for a missing leaf");
 });
 
+// --- adopting notes from the server-proving era ---------------------------
+
+say("\nlegacy note adoption");
+
+/** Shape the import endpoint returns: a note plus its explicit secrets. */
+function legacyNote(id, units, overrides = {}) {
+  return {
+    id,
+    commitment: "0",
+    marketId: "0",
+    outcome: 0,
+    units: String(units),
+    status: "grafted",
+    label: `Deposit · ${units} units`,
+    createdAt: Date.now(),
+    imported: { nullifier: "12345678901234567890", secret: "98765432109876543210" },
+    ...overrides,
+  };
+}
+
+await test("an adopted note uses its own secrets, not derived ones", async () => {
+  const vault = await Vault.unlock(SIG_A, null);
+  vault.adoptLegacy([legacyNote("aa11", 100)]);
+
+  const secrets = await vault.secretsFor(vault.note("aa11"));
+  assertEqual(secrets.nullifier, 12345678901234567890n, "did not use the imported nullifier");
+  assertEqual(secrets.secret, 98765432109876543210n, "did not use the imported secret");
+});
+
+await test("adoption does not consume derivation indices", async () => {
+  const vault = await Vault.unlock(SIG_A, null);
+  vault.adoptLegacy([legacyNote("aa11", 100), legacyNote("bb22", 10)]);
+  const { index } = await vault.allocate();
+  assertEqual(index, 0, "adopted notes stole a derivation slot");
+});
+
+await test("adoption is recorded so it cannot run twice", async () => {
+  const vault = await Vault.unlock(SIG_A, null);
+  assert(!vault.hasImportedLegacy, "a fresh vault should not claim to have imported");
+  vault.adoptLegacy([legacyNote("aa11", 100)]);
+  assert(vault.hasImportedLegacy, "adoption was not recorded");
+
+  // Survives a round trip: the server's rows are not updated when this vault spends a note, so
+  // a second import would resurrect notes already spent.
+  const reopened = await Vault.unlock(SIG_A, await vault.seal());
+  assert(reopened.hasImportedLegacy, "the flag did not survive seal/unlock");
+});
+
+await test("re-adoption never overwrites a note the vault already holds", async () => {
+  const vault = await Vault.unlock(SIG_A, null);
+  vault.adoptLegacy([legacyNote("aa11", 100)]);
+  vault.update("aa11", { status: "spent" });
+
+  const added = vault.adoptLegacy([legacyNote("aa11", 100)]);
+  assertEqual(added, 0, "re-adopted a note that was already present");
+  assertEqual(vault.note("aa11").status, "spent", "re-adoption resurrected a spent note");
+});
+
+await test("adopted notes survive a seal/unlock with their secrets intact", async () => {
+  const first = await Vault.unlock(SIG_A, null);
+  first.adoptLegacy([legacyNote("aa11", 100)]);
+
+  const reopened = await Vault.unlock(SIG_A, await first.seal());
+  const secrets = await reopened.secretsFor(reopened.note("aa11"));
+  assertEqual(secrets.nullifier, 12345678901234567890n, "imported nullifier did not survive");
+  assertEqual(secrets.secret, 98765432109876543210n, "imported secret did not survive");
+});
+
+await test("an adopted note is spendable -- it proves and relays like any other", async () => {
+  const server = makeServer();
+  const ctx = await makeContext(server);
+
+  // A real note whose secrets the vault did NOT derive: built exactly as the server-proving
+  // path would have, then handed over the way /api/atrum/vault/import hands it over.
+  const nullifier = 111222333444555666777n;
+  const secret = 777666555444333222111n;
+  const units = 100n;
+  const commitment = noteCommitment({ nullifier, secret, marketId: 0n, outcome: 0n, units });
+
+  ctx.vault.adoptLegacy([
+    legacyNote(commitment.toString(16).slice(0, 8), 100, {
+      commitment: commitment.toString(),
+      imported: { nullifier: nullifier.toString(), secret: secret.toString() },
+    }),
+  ]);
+  await ctx.save();
+
+  server.tree.insert(commitment);
+  const id = commitment.toString(16).slice(0, 8);
+
+  const result = await actions.bet(ctx, id, MARKET, "yes");
+  assert(result.txHash, "an adopted note could not be bet");
+
+  const args = server.relayed[0].args;
+  const ok = await verifyProof("bet_encrypted", server.relayed[0], [
+    args[0], args[1], args[2], args[3], ...args[4],
+  ]);
+  assert(ok, "a bet built from an adopted note did not verify");
+  assertEqual(args[1], nullifierHash(nullifier), "the adopted note's nullifier hash is wrong");
+});
+
 // --- commitment agreement -------------------------------------------------
 
 say("\ncommitment agreement with atrum.mjs");

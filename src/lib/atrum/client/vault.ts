@@ -47,9 +47,13 @@ export const VAULT_MESSAGE =
 
 export type NoteStatus = "queued" | "grafted" | "spent";
 
-/** The non-secret half of a note. Secrets are re-derived from `index` on demand. */
+/**
+ * The non-secret half of a note. Secrets are re-derived from `index` on demand -- except for
+ * notes adopted from the server-proving era, which carry theirs explicitly.
+ */
 export interface VaultNote {
   id: string;
+  /** Derivation slot. Ignored when `imported` is present. */
   index: number;
   commitment: string;
   marketId: string;
@@ -59,15 +63,34 @@ export interface VaultNote {
   label: string;
   createdAt: number;
   txHash?: string;
+  /**
+   * Secrets for a note this vault did NOT derive.
+   *
+   * Notes created under server-side proving had random secrets held in the `notes` table, and
+   * no derivation reaches them. Adopting them is the only alternative to every existing
+   * position vanishing the moment a deployment switches to client-side proving. Decimal
+   * strings, because the blob is JSON and BigInt does not survive it.
+   *
+   * Present only on migrated notes; everything created since derives from `index` as usual.
+   */
+  imported?: { nullifier: string; secret: string };
 }
 
 interface VaultBlob {
   version: 1;
   nextIndex: number;
   notes: VaultNote[];
+  /**
+   * Whether the one-time adoption of server-proving notes has run.
+   *
+   * A flag rather than a per-poll comparison, because the server's `notes` rows are not updated
+   * when this vault spends one. Re-importing would keep resurrecting notes the vault has
+   * already spent, and the user would see phantom balances that revert on use.
+   */
+  importedLegacy?: boolean;
 }
 
-const EMPTY: VaultBlob = { version: 1, nextIndex: 0, notes: [] };
+const EMPTY: VaultBlob = { version: 1, nextIndex: 0, notes: [], importedLegacy: false };
 
 // ---------------------------------------------------------------------------
 // Key derivation
@@ -242,9 +265,34 @@ export class Vault {
     return found;
   }
 
-  /** Secrets for a note already in the vault. */
+  /** Secrets for a note already in the vault: adopted ones carry theirs, the rest derive. */
   secretsFor(note: VaultNote): Promise<{ nullifier: bigint; secret: bigint }> {
+    if (note.imported) {
+      return Promise.resolve({
+        nullifier: BigInt(note.imported.nullifier),
+        secret: BigInt(note.imported.secret),
+      });
+    }
     return deriveNoteSecrets(this.seed, note.index);
+  }
+
+  get hasImportedLegacy(): boolean {
+    return this.blob.importedLegacy === true;
+  }
+
+  /**
+   * Adopt notes from the server-proving era. Runs once.
+   *
+   * `index: -1` marks them as non-derived -- nothing allocates that slot, and `secretsFor`
+   * never consults it. Existing ids are left alone so a re-run cannot overwrite a note this
+   * vault has since spent.
+   */
+  adoptLegacy(notes: Omit<VaultNote, "index">[]): number {
+    const existing = new Set(this.blob.notes.map((n) => n.id));
+    const fresh = notes.filter((n) => !existing.has(n.id)).map((n) => ({ ...n, index: -1 }));
+    this.blob.notes = [...this.blob.notes, ...fresh];
+    this.blob.importedLegacy = true;
+    return fresh.length;
   }
 
   /**

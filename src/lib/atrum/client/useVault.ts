@@ -48,6 +48,30 @@ async function saveBlob(blob: string): Promise<void> {
 }
 
 /** The unlocked vault together with the address it belongs to. */
+/**
+ * Notes the server-proving era created for this address, secrets included.
+ *
+ * Best effort: a vault that unlocks without them still works for anything created since, and
+ * failing the unlock outright would lock a user out over a transient network error. Returns
+ * null on failure so the caller can tell "nothing to adopt" from "could not ask" -- the
+ * difference matters, because the second must not set the imported-once flag.
+ */
+async function fetchLegacyNotes(): Promise<Omit<VaultNote, "index">[] | null> {
+  try {
+    const res = await fetch("/api/atrum/vault/import");
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      notes: (Omit<VaultNote, "index" | "imported"> & { nullifier: string; secret: string })[];
+    };
+    return body.notes.map(({ nullifier, secret, ...rest }) => ({
+      ...rest,
+      imported: { nullifier, secret },
+    }));
+  } catch {
+    return null;
+  }
+}
+
 interface Held {
   address: string | null;
   vault: Vault;
@@ -110,7 +134,43 @@ export function useVault(
         // unreachable server for an empty vault and start a fresh one over the top of it.
         const stored = await loadBlob();
         const signature = await signMessage(VAULT_MESSAGE);
+
+        // A vault is only as recoverable as the wallet's signature is REPRODUCIBLE. The seed is
+        // SHA-256 of these exact bytes, so a wallet that signs the same message differently
+        // twice derives a different vault every session and locks its owner out of their own
+        // notes -- on this browser, not just on a new device.
+        //
+        // Ordinary EOAs are safe: RFC 6979 makes ECDSA deterministic. Smart-contract accounts
+        // (Safe, ERC-4337, Coinbase Smart Wallet) sign via ERC-1271 and promise nothing of the
+        // sort, and the connector will happily connect one.
+        //
+        // Checked ONLY when creating a vault, so it costs one extra prompt once and never
+        // again. Discovering this at creation is a supported-wallet message; discovering it
+        // later is a permanent lockout with no self-service recovery.
+        if (stored === null) {
+          const again = await signMessage(VAULT_MESSAGE);
+          if (again !== signature) {
+            throw new Error(
+              "This wallet signs the same message differently each time, so it cannot hold a " +
+                "note vault -- your notes would be unrecoverable on the next visit. Smart-contract " +
+                "wallets usually behave this way. Connect a standard wallet (MetaMask, Rabby, or a " +
+                "hardware wallet) instead.",
+            );
+          }
+        }
+
         const vault = await Vault.unlock(signature, stored);
+
+        // Adopt anything from the server-proving era, once. Without this, switching a
+        // deployment to client-side proving makes every existing position vanish from its
+        // owner's portfolio -- unspendable and invisible until the flag is switched back.
+        if (!vault.hasImportedLegacy) {
+          const legacy = await fetchLegacyNotes();
+          if (legacy) {
+            vault.adoptLegacy(legacy);
+            await saveBlob(await vault.seal());
+          }
+        }
         // Stamped with the address it was unlocked for. If the user switched wallets while
         // this was in flight, the stamp will not match and it reads as locked rather than
         // silently attaching one account's notes to another.
