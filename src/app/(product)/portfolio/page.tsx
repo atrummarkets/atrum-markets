@@ -132,7 +132,8 @@ const ACTION_LABEL: Record<"bet" | "redeem" | "withdraw", { simple: string; deta
 
 export default function PortfolioPage() {
   const router = useRouter();
-  const { notes, markets, activity, error, clearError, redeem } = useMarket();
+  const { notes, markets, activity, error, clearError, redeem, clientProving, vaultUnlocked, vaultUnlocking, unlockVault } =
+    useMarket();
   const { session, connect, connecting } = useWallet();
   const { mode } = useDetailMode();
   const [withdrawing, setWithdrawing] = useState<LiveNote | null>(null);
@@ -193,7 +194,40 @@ export default function PortfolioPage() {
         </div>
       )}
 
-      {notes.length === 0 ? (
+      {clientProving && !vaultUnlocked ? (
+        /*
+          Locked, not empty -- and the difference is everything. Notes live in a vault whose key
+          is derived from a signature this browser does not hold until it asks for one. Rendering
+          "nothing here yet" in this state told returning users their positions were gone.
+          Unlocking is a wallet prompt, so it stays a deliberate click rather than something that
+          fires at a passive visitor.
+        */
+        <div style={{ padding: 64, border: `1px solid ${color.hairline}`, textAlign: "center" }}>
+          <p style={{ margin: "0 0 12px", fontSize: 17, color: color.bone }}>
+            Your notes are sealed.
+          </p>
+          <p style={{ margin: "0 auto 24px", fontSize: 14, color: color.smoke, maxWidth: 460, lineHeight: 1.6 }}>
+            They are encrypted with a key only your wallet can derive — this site cannot read them
+            without you. Sign once to open them. It is not a transaction and costs nothing.
+          </p>
+          <button
+            onClick={unlockVault}
+            disabled={vaultUnlocking}
+            style={{
+              padding: "12px 28px",
+              border: `1px solid ${color.hairlineStrong}`,
+              background: "none",
+              color: color.bone,
+              borderRadius: 2,
+              cursor: vaultUnlocking ? "wait" : "pointer",
+              fontSize: 14,
+              letterSpacing: "0.04em",
+            }}
+          >
+            {vaultUnlocking ? "Check your wallet…" : "Unlock my notes"}
+          </button>
+        </div>
+      ) : notes.length === 0 ? (
         <div style={{ padding: 64, border: `1px solid ${color.hairline}`, textAlign: "center" }}>
           <p style={{ margin: "0 0 24px", fontSize: 17, color: color.smoke }}>
             Nothing here yet. Add funds to get started.

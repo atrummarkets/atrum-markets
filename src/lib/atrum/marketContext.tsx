@@ -125,6 +125,18 @@ interface Value {
   clientProving: boolean;
   /** Whether the note vault has been unlocked this session. Meaningless unless `clientProving`. */
   vaultUnlocked: boolean;
+  /** True while the unlock signature is being requested. */
+  vaultUnlocking: boolean;
+  /**
+   * Prompt for the vault signature and load the user's notes.
+   *
+   * EXPOSED BECAUSE LAZY UNLOCK BROKE THE PORTFOLIO. Unlocking is deliberately not automatic --
+   * it is a wallet prompt, and firing one at a passive visitor is hostile. But the portfolio is
+   * the first thing a returning user opens, and with no vault it rendered empty with no prompt
+   * and no explanation: notes intact on chain, invisible in the product, nothing to click.
+   * Screens that show notes call this instead of pretending the account is empty.
+   */
+  unlockVault: () => Promise<void>;
   refresh: () => void;
   dismissReceipt: () => void;
   clearError: () => void;
@@ -508,6 +520,17 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       getOddsHistory: (marketId: number) => oddsHistoryRef.current.get(marketId) ?? [],
       clientProving: CLIENT_PROVING,
       vaultUnlocked: vault.unlocked,
+      vaultUnlocking: vault.unlocking,
+      unlockVault: async () => {
+        try {
+          await vault.unlock();
+          // Notes land as `queued` until the sequencer grafts them; refresh promotes anything
+          // already grafted so the list is right on the first paint rather than 5s later.
+          await vault.refresh().catch(() => {});
+        } catch (e) {
+          setError((e as Error).message);
+        }
+      },
       refresh,
       dismissReceipt: () => setReceipt(null),
       clearError: () => setError(null),
@@ -517,7 +540,8 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       redeem,
       withdraw,
     }),
-    [config, markets, pool, exposedNotes, activity, receipt, receiptHistory, error, walletUnits, vault.unlocked, refresh, deposit, faucet, bet, redeem, withdraw],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [config, markets, pool, exposedNotes, activity, receipt, receiptHistory, error, walletUnits, vault.unlocked, vault.unlocking, refresh, deposit, faucet, bet, redeem, withdraw],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
