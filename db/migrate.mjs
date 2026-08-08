@@ -83,6 +83,19 @@ const STATEMENTS = [
     spec jsonb,
     PRIMARY KEY (pool, id)
   )`,
+  // Client-side note vaults. `blob` is AES-GCM ciphertext the browser produced under a key
+  // derived from a wallet signature (lib/atrum/client/vault.ts) -- this server cannot read it
+  // and must never be able to. It exists only so notes survive a cleared browser and follow
+  // the user across devices, which is what the plaintext `notes` table above bought at the
+  // cost of handing the operator every spending secret.
+  //
+  // `notes` is deliberately left in place: the server-proving path still uses it, and dropping
+  // a table that holds the only copy of live note secrets would burn real testnet positions.
+  `CREATE TABLE IF NOT EXISTS note_vaults (
+    owner text PRIMARY KEY,
+    blob text NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
 ];
 
 for (const sql of STATEMENTS) {

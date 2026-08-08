@@ -41,6 +41,14 @@ export interface AppConfig {
   /** The operator EOA. Resolve/settle are restricted to it; the UI hides its controls. */
   operator: `0x${string}`;
   circuits: Record<"deposit" | "bet" | "redeem" | "withdraw", CircuitFacts>;
+  /**
+   * The PUBLIC half of the committee key, as decimal strings. A browser proving its own bet
+   * encrypts the stake to it. Published because it is the encryption target -- the secret half
+   * stays server-side for settlement and the odds board.
+   */
+  committeePubKey: [string, string];
+  /** Whether this deployment proves in the browser rather than on the server. */
+  clientProving: boolean;
   poolAbi: unknown[];
 }
 

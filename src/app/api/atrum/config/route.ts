@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { POOL_ADDRESS, COLLATERAL_ADDRESS, CHAIN_ID, PUBLIC_RPC_URL, publicClient, ERC20_ABI, POOL_ABI, operatorAddress } from "@/server/atrum/chain";
 import { readPool } from "@/server/atrum/markets";
 import { circuitFacts } from "@/server/atrum/circuits";
+import { committeeKey } from "@/server/atrum/committee";
 
 /** Everything the browser needs to talk to this deployment. All read from chain or disk. */
 export async function GET() {
@@ -29,6 +30,17 @@ export async function GET() {
       // `resolver` stored in each demo market's Vault. Served so the UI can hide operator
       // controls from everyone else; the routes enforce it regardless.
       operator: operatorAddress,
+      // The PUBLIC half of the committee key. A browser proving its own bet has to encrypt the
+      // stake to it, so this is not optional and not a leak -- it is the encryption target,
+      // published for exactly that purpose. The secret half stays server-side, where
+      // settlement and the odds board genuinely need it (see server/atrum/committee.ts).
+      committeePubKey: committeeKey().pubKey,
+      /**
+       * Whether this deployment proves in the browser. The UI reads it to decide which trust
+       * statement to make, and it is served from the server rather than inferred client-side
+       * so the claim can never disagree with what the routes actually do.
+       */
+      clientProving: process.env.NEXT_PUBLIC_CLIENT_PROVING === "1",
       poolAbi: POOL_ABI,
     });
   } catch (error) {
