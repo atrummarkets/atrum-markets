@@ -94,7 +94,24 @@ export function useVault(
   committeePubKey: readonly [string, string] | null,
   sessionAddress: string | null,
 ): UseVault {
-  const [held, setHeld] = useState<Held | null>(null);
+  const [held, setHeldState] = useState<Held | null>(null);
+  /**
+   * The same value as `held`, readable from callbacks.
+   *
+   * WHY BOTH. `held` drives rendering, but consumers memoise their action handlers -- and
+   * `marketContext`'s bet/redeem/withdraw deliberately do NOT list this hook in their deps.
+   * A callback that closed over `held` therefore kept seeing the value from the render it was
+   * created in, which is the render BEFORE anything was unlocked. The first action after
+   * unlocking then threw "vault is locked" while the notes were plainly on screen.
+   *
+   * Callbacks read the ref, so they are immune to that regardless of when they were created.
+   * Reading a ref inside an event handler is fine; only reading one DURING render is not.
+   */
+  const heldRef = useRef<Held | null>(null);
+  const setHeld = useCallback((next: Held | null) => {
+    heldRef.current = next;
+    setHeldState(next);
+  }, []);
   const [unlocking, setUnlocking] = useState(false);
   // Bumped whenever the (mutable) vault's contents change, so `notes` recomputes. The vault is
   // mutated in place by `actions.ts`; without a version React would never see the change.
@@ -118,10 +135,11 @@ export function useVault(
   const lock = useCallback(() => {
     inflight.current = null;
     setHeld(null);
-  }, []);
+  }, [setHeld]);
 
   const unlock = useCallback(async (): Promise<Vault> => {
-    if (held && held.address === sessionAddress) return held.vault;
+    const current = heldRef.current;
+    if (current && current.address === sessionAddress) return current.vault;
     if (inflight.current) return inflight.current;
     if (!signMessage) throw new Error("connect your wallet first");
 
@@ -184,14 +202,15 @@ export function useVault(
 
     inflight.current = run;
     return run;
-  }, [held, sessionAddress, signMessage]);
+  }, [sessionAddress, signMessage, setHeld]);
 
   const save = useCallback(async () => {
-    const vault = held && held.address === sessionAddress ? held.vault : null;
+    const current = heldRef.current;
+    const vault = current && current.address === sessionAddress ? current.vault : null;
     if (!vault) throw new Error("vault is locked");
     await saveBlob(await vault.seal());
     publish();
-  }, [held, sessionAddress, publish]);
+  }, [sessionAddress, publish]);
 
   const context = useCallback(async (): Promise<ActionContext> => {
     if (!committeePubKey) throw new Error("config not loaded");
@@ -211,9 +230,11 @@ export function useVault(
    * correlation leak `/path` had, just in bulk and on a timer.
    */
   const refresh = useCallback(async () => {
-    if (!active) return;
+    const current = heldRef.current;
+    const vault = current && current.address === sessionAddress ? current.vault : null;
+    if (!vault) return;
 
-    const queued = active.notes.filter((n) => n.status === "queued");
+    const queued = vault.notes.filter((n) => n.status === "queued");
     if (queued.length === 0) return;
 
     const grafted = await graftedSet(queued.map((n) => n.commitment));
@@ -221,16 +242,16 @@ export function useVault(
     let changed = false;
     for (const note of queued) {
       if (grafted[note.commitment]) {
-        active.update(note.id, { status: "grafted" });
+        vault.update(note.id, { status: "grafted" });
         changed = true;
       } else if (!note.txHash && Date.now() - note.createdAt > ABANDONED_AFTER_MS) {
-        active.remove(note.id);
+        vault.remove(note.id);
         changed = true;
       }
     }
 
     if (changed) await save();
-  }, [active, save]);
+  }, [sessionAddress, save]);
 
   return { notes, unlocked: active !== null, unlocking, unlock, context, refresh, lock };
 }
