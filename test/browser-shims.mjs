@@ -12,6 +12,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import * as snarkjs from "snarkjs";
+import { toCalldata } from "../src/lib/atrum/client/calldata.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const PUBLIC = join(ROOT, "public");
@@ -50,6 +51,14 @@ export function onApi(handler) {
   apiHandler = handler;
 }
 
+/**
+ * Node's own fetch, kept before it is replaced.
+ *
+ * `live-client-proving.test.mjs` talks to a REAL dev server, so it needs a way past this shim.
+ * Capturing it inside the test is too late -- importing this module has already swapped it.
+ */
+globalThis.__realFetch = globalThis.fetch;
+
 globalThis.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input.url;
 
@@ -75,8 +84,14 @@ globalThis.Worker = class FakeWorker {
           new Uint8Array(wasm),
           new Uint8Array(zkey),
         );
-        const raw = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
-        const [pA, pB, pC, signals] = JSON.parse(`[${raw}]`);
+        // The SHARED encoder, not a copy of it. This harness previously carried its own and
+        // drifted: the worker was fixed to emit decimal limbs, this kept emitting hex, and the
+        // unit suite passed while the live relay rejected every proof.
+        const { pA, pB, pC, publicSignals: signals } = await toCalldata(
+          snarkjs.groth16.exportSolidityCallData,
+          proof,
+          publicSignals,
+        );
         this.onmessage?.({
           data: { id, ok: true, pA, pB, pC, publicSignals: signals, provingMs: Date.now() - t0 },
         });

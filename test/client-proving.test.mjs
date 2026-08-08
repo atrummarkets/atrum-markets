@@ -165,6 +165,23 @@ function makeServer() {
       });
     }
     if (url === "/api/atrum/relay") {
+      // Validate exactly as /api/atrum/relay does. A mock that accepts anything is how hex
+      // proof limbs reached the real route undetected -- the unit suite passed while the live
+      // stack rejected every relay with "pA[0] must be a decimal string".
+      for (const [name, limbs] of [["pA", body.pA], ["pC", body.pC]]) {
+        for (const [i, v] of limbs.entries()) {
+          if (typeof v !== "string" || !/^\d+$/.test(v)) {
+            return Response.json({ error: `${name}[${i}] must be a decimal string` }, { status: 400 });
+          }
+        }
+      }
+      for (const [r, row] of body.pB.entries()) {
+        for (const [i, v] of row.entries()) {
+          if (typeof v !== "string" || !/^\d+$/.test(v)) {
+            return Response.json({ error: `pB[${r}][${i}] must be a decimal string` }, { status: 400 });
+          }
+        }
+      }
       if (state.relayError) {
         const err = state.relayError;
         state.relayError = null;
@@ -587,6 +604,19 @@ await test("a failed relay leaves the source note spendable again", async () => 
 // --- the property the whole change exists for -----------------------------
 
 say("\nthe privacy property");
+
+await test("proof limbs are relayed as decimal, not hex", async () => {
+  // snarkjs emits hex from exportSolidityCallData; the relay route accepts decimal only.
+  const server = makeServer();
+  const ctx = await makeContext(server);
+  const deposited = await depositInto(server, ctx);
+  await actions.bet(ctx, deposited.id, MARKET, "yes");
+
+  const { pA, pB, pC } = server.relayed[0];
+  for (const v of [...pA, ...pC, ...pB.flat()]) {
+    assert(/^\d+$/.test(v), `proof limb "${v}" is not a decimal string`);
+  }
+});
 
 await test("no secret ever reaches the server", async () => {
   const server = makeServer();

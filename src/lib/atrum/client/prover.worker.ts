@@ -17,6 +17,7 @@
  * later be pushed through (a SharedWorker, a service worker) without a second thought.
  */
 import * as snarkjs from "snarkjs";
+import { toCalldata } from "./calldata";
 
 export interface ProveRequest {
   id: number;
@@ -41,11 +42,14 @@ self.onmessage = async (event: MessageEvent<ProveRequest>) => {
       new Uint8Array(zkey),
     );
 
-    // The same calldata encoding the server path used, and the same reason: snarkjs swaps the
-    // G2 limbs relative to the raw proof, so hand-assembling `pB` from `proof.pi_b` produces a
-    // proof the verifier rejects with no useful diagnostic.
-    const raw = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
-    const [pA, pB, pC, signals]: [string[], string[][], string[], string[]] = JSON.parse(`[${raw}]`);
+    // Encoding and decimal-normalisation live in calldata.ts, shared with the Node test
+    // harness so the two cannot drift -- they already did once, and the unit suite passed
+    // while every live relay was rejected.
+    const { pA, pB, pC, publicSignals: signals } = await toCalldata(
+      snarkjs.groth16.exportSolidityCallData,
+      proof,
+      publicSignals,
+    );
 
     const response: ProveResponse = {
       id,
