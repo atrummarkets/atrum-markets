@@ -109,6 +109,48 @@ async function pickMarket() {
   return picked.marketId;
 }
 
+/**
+ * Place the bet, and survive a lost response.
+ *
+ * A relayed bet is submitted on chain BEFORE the client sees a reply, so a network error on
+ * the way back is not the same as a failed bet. On market 57 four wallets reported
+ * "fetch failed" while the chain recorded their bets: the script logged 2/6 and the market
+ * showed five. Worse than the miscount, each of those notes stayed marked unspent locally
+ * while its nullifier was already spent, so a retry could only ever revert with
+ * NullifierAlreadySpent.
+ *
+ * So a transport failure asks the server what actually happened instead of guessing. The
+ * source note turning `spent` is proof the bet landed; anything else is a real failure.
+ */
+async function betWithRecovery(i, addr, cookie, noteId, marketId, side) {
+  try {
+    const { body } = await api("/api/atrum/bet", cookie, {
+      method: "POST",
+      body: JSON.stringify({ noteId, marketId, side }),
+    });
+    return { txHash: body.txHash, relayer: body.relayer, recovered: false };
+  } catch (error) {
+    // A 4xx is the server declining, and it declines before relaying -- nothing to recover.
+    if (!/fetch failed|socket|ECONN|network|timeout/i.test(error.message)) throw error;
+
+    log(i, addr, `bet response lost (${error.message}) -- checking whether it landed`);
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await new Promise((r) => setTimeout(r, 5000));
+      try {
+        const { body: notes } = await api("/api/atrum/notes", cookie);
+        const source = notes.notes.find((n) => n.id === noteId);
+        if (source?.status === "spent") {
+          // The tx hash is only in the response that was lost; the outcome is not in doubt.
+          return { txHash: "(response lost, bet confirmed spent)", relayer: "unknown", recovered: true };
+        }
+      } catch {
+        // Still unreachable -- keep trying rather than concluding anything.
+      }
+    }
+    throw new Error(`bet response lost and the note is still unspent after 30s: ${error.message}`);
+  }
+}
+
 async function runWallet(i, account, marketId, config) {
   const wallet = createWalletClient({ chain: monadTestnet, transport: http(), account });
   const addr = account.address;
@@ -131,6 +173,11 @@ async function runWallet(i, account, marketId, config) {
     abi: ERC20_ABI,
     functionName: "mint",
     args: [addr, raw],
+      // Declared, never estimated. viem's estimate is rejected on Monad with
+      // "Signer had insufficient balance" -- a wallet holding 0.5 MON for a call costing
+      // 0.0063 MON, so the message names the wrong cause entirely. Same failure this repo
+      // already documents for deposits and plain transfers; it applies to every write.
+      gas: 100_000n,
     chain: monadTestnet,
     account,
   });
@@ -157,6 +204,11 @@ async function runWallet(i, account, marketId, config) {
     abi: ERC20_ABI,
     functionName: "approve",
     args: [config.pool, raw],
+      // Declared, never estimated. viem's estimate is rejected on Monad with
+      // "Signer had insufficient balance" -- a wallet holding 0.5 MON for a call costing
+      // 0.0063 MON, so the message names the wrong cause entirely. Same failure this repo
+      // already documents for deposits and plain transfers; it applies to every write.
+      gas: 100_000n,
     chain: monadTestnet,
     account,
   });
@@ -205,11 +257,14 @@ async function runWallet(i, account, marketId, config) {
 
   // --- bet: relayed. This wallet's address never appears on that transaction. ---
   const side = Math.random() < 0.5 ? "yes" : "no";
-  const { body: result } = await api("/api/atrum/bet", cookie, {
-    method: "POST",
-    body: JSON.stringify({ noteId: prepared.id, marketId, side }),
-  });
-  log(i, addr, `bet ${side.toUpperCase()} -- tx ${result.txHash.slice(0, 10)}… via relayer ${result.relayer.slice(0, 10)}…`);
+  const result = await betWithRecovery(i, addr, cookie, prepared.id, marketId, side);
+  log(
+    i,
+    addr,
+    result.recovered
+      ? `bet ${side.toUpperCase()} -- confirmed on chain, response was lost`
+      : `bet ${side.toUpperCase()} -- tx ${result.txHash.slice(0, 10)}… via relayer ${result.relayer.slice(0, 10)}…`,
+  );
 
   return { address: addr, side, txHash: result.txHash };
 }
