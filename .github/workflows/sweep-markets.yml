@@ -1,0 +1,55 @@
+# Resolve and settle oracle markets on a schedule.
+#
+# WHY GITHUB ACTIONS. PythResolver.resolve() is permissionless and checks a signed price
+# against a spec committed at market creation -- no privileged caller, no outcome to choose --
+# but somebody still had to run a script, so markets sat closed and unredeemable until they
+# did. Vercel Cron is capped at once per day on Hobby, which is useless for a twenty-minute
+# market, and setting CRON_SECRET there needs a dashboard not everyone on this team has. A
+# workflow file is a commit, and its secret lives in this repo.
+#
+# Setup, once:
+#   Settings -> Secrets and variables -> Actions -> New repository secret
+#     OPERATOR_PRIVATE_KEY = the key whose address the markets name as resolver
+#
+# That key can resolve markets and spend gas. It cannot touch user notes. On mainnet it should
+# be a dedicated key holding only the resolver role, not the deployer.
+
+name: Sweep markets
+
+on:
+  schedule:
+    # Every 5 minutes -- GitHub's minimum. Treated as best-effort: Actions delays scheduled
+    # runs under load, sometimes by many minutes. That is fine here because the job is
+    # idempotent and markets are not time-critical to the second, but it is the reason this is
+    # not the mechanism to rely on if resolution ever becomes latency-sensitive.
+    - cron: "*/5 * * * *"
+  # So a demo can force a sweep from the Actions tab without waiting for the schedule.
+  workflow_dispatch:
+
+# Never let two sweeps overlap. They share the operator's nonce, and concurrent transactions
+# from one account race it -- the second is dropped or replaces the first.
+concurrency:
+  group: sweep-markets
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Only viem is needed. A full `npm ci` pulls Next, snarkjs and the rest for a script
+      # that makes three HTTP calls and signs a message.
+      - name: Install viem
+        run: npm install --no-save --no-audit --no-fund viem
+
+      - name: Sweep
+        env:
+          OPERATOR_PRIVATE_KEY: ${{ secrets.OPERATOR_PRIVATE_KEY }}
+          BASE_URL: https://markets.atrum.fun
+        run: node scripts/sweep-markets.mjs
