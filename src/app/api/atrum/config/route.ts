@@ -40,7 +40,7 @@ export async function GET() {
        * statement to make, and it is served from the server rather than inferred client-side
        * so the claim can never disagree with what the routes actually do.
        */
-      clientProving: process.env.NEXT_PUBLIC_CLIENT_PROVING === "1",
+      clientProving: process.env.NEXT_PUBLIC_CLIENT_PROVING !== "0",
       poolAbi: POOL_ABI,
     });
   } catch (error) {

@@ -39,18 +39,25 @@ const POLL_MS = 5000;
 const ODDS_HISTORY_CAP = 60;
 
 /**
- * Whether this build proves in the browser.
+ * Whether this build proves in the browser. ON unless explicitly disabled.
  *
- * A build-time constant, not a runtime toggle: the two paths store notes in different places
- * (Postgres rows with secrets vs. an encrypted vault), and letting a single deployment flip
- * between them at runtime would strand notes in whichever store was not being read. Flipping
- * it is a deploy, deliberately.
+ * OPT-OUT, NOT OPT-IN, AND THAT IS DELIBERATE. `NEXT_PUBLIC_*` is inlined at build time, so
+ * this can only be changed by a deploy either way -- and the deploy this team can actually
+ * reach is a git push, not the hosting dashboard. An opt-in flag put the product's central
+ * claim behind a switch nobody on call could flip; an opt-out one puts the KILL switch behind
+ * a `git revert`, which is the direction that matters when something is wrong at 3am.
  *
- * The server-side path is left fully intact behind this flag rather than deleted. It is what
- * every live note on the current deployment was created with, and deleting the only code that
- * can spend them would burn real testnet positions.
+ * Set NEXT_PUBLIC_CLIENT_PROVING=0 to force the server-proving path back on.
+ *
+ * A build-time constant, never a runtime toggle: the two paths store notes in different places
+ * (Postgres rows holding secrets vs. an encrypted vault), and flipping between them within one
+ * deployment would strand notes in whichever store was not being read.
+ *
+ * The server path is left fully intact rather than deleted. It created every pre-existing
+ * note, and `/api/atrum/vault/import` hands those notes to the browser precisely so switching
+ * does not orphan them.
  */
-const CLIENT_PROVING = process.env.NEXT_PUBLIC_CLIENT_PROVING === "1";
+const CLIENT_PROVING = process.env.NEXT_PUBLIC_CLIENT_PROVING !== "0";
 
 const DEPOSIT_ABI = parseAbi([
   "function deposit(uint256[2] pA, uint256[2][2] pB, uint256[2] pC, uint256 commitment, uint256 units)",
