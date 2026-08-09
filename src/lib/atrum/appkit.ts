@@ -3,6 +3,7 @@
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { createAppKit } from "@reown/appkit/react";
 import { monadTestnet as appkitMonadTestnet, type AppKitNetwork } from "@reown/appkit/networks";
+import { browserRpcUrls } from "./rpc";
 
 /**
  * Wallet connection lives behind AppKit (Reown, the WalletConnect people) rather than being
@@ -17,7 +18,7 @@ import { monadTestnet as appkitMonadTestnet, type AppKitNetwork } from "@reown/a
  * phones, as one list.
  */
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://testnet-rpc.monad.xyz";
+const RPC_URLS = browserRpcUrls();
 export const PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 
 /**
@@ -27,7 +28,7 @@ export const PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? ""
  */
 export const monadNetwork: AppKitNetwork = {
   ...appkitMonadTestnet,
-  rpcUrls: { default: { http: [RPC_URL] } },
+  rpcUrls: { default: { http: RPC_URLS } },
 };
 
 export const CHAIN_ID = Number(monadNetwork.id);

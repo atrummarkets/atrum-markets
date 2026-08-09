@@ -13,17 +13,18 @@ import {
 import { getWalletClient } from "@wagmi/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAppKit } from "@reown/appkit/react";
-import { createPublicClient, http, defineChain, type Address, type WalletClient, type PublicClient } from "viem";
+import { createPublicClient, http, fallback, defineChain, type Address, type WalletClient, type PublicClient } from "viem";
 
 import { CHAIN_ID, PROJECT_ID, wagmiAdapter } from "./appkit";
+import { browserRpcUrls } from "./rpc";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://testnet-rpc.monad.xyz";
+const RPC_URLS = browserRpcUrls();
 
 export const monadTestnet = defineChain({
   id: CHAIN_ID,
   name: "Monad Testnet",
   nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
-  rpcUrls: { default: { http: [RPC_URL] } },
+  rpcUrls: { default: { http: RPC_URLS } },
   blockExplorers: { default: { name: "MonadExplorer", url: "https://testnet.monadexplorer.com" } },
 });
 
@@ -56,7 +57,17 @@ interface WalletValue {
 
 const WalletContext = createContext<WalletValue | null>(null);
 
-const publicClient = createPublicClient({ chain: monadTestnet, transport: http(RPC_URL) }) as PublicClient;
+// Rotating, so one rate-limited public endpoint degrades reads instead of stopping them.
+const publicClient = createPublicClient({
+  chain: monadTestnet,
+  transport: fallback(
+  // A 10s cap per endpoint. Without it a provider that ACCEPTS the connection and never answers
+  // -- which is how a bad Alchemy key behaves, rather than returning an error -- holds the whole
+  // request open and rotation never gets its turn.
+    RPC_URLS.map((url) => http(url, { retryCount: 2, retryDelay: 300, timeout: 10_000 })),
+    { rank: RPC_URLS.length > 1 ? { interval: 30_000, sampleCount: 3 } : false },
+  ),
+}) as PublicClient;
 
 const queryClient = new QueryClient();
 

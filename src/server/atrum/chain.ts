@@ -46,7 +46,7 @@ export const monadTestnet = defineChain({
  */
 function rotating() {
   return fallback(
-    RPC_URLS.map((url) => http(url, { retryCount: 2, retryDelay: 300 })),
+    RPC_URLS.map((url) => http(url, { retryCount: 2, retryDelay: 300, timeout: 10_000 })),
     { rank: RPC_URLS.length > 1 ? { interval: 30_000, sampleCount: 3 } : false },
   );
 }
@@ -64,8 +64,16 @@ export const SEQUENCER_URL = env("SEQUENCER_URL");
  */
 export const CIRCUITS_DIR = process.env.CIRCUITS_DIR ?? join(process.cwd(), "circuits-build");
 
-/** The public RPC the BROWSER should use. Kept separate from the server list above. */
-export const PUBLIC_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://testnet-rpc.monad.xyz";
+/**
+ * The public RPC the BROWSER should use. Kept separate from the server list above.
+ *
+ * Reduced to a single endpoint even if a list was configured: this value is published through
+ * `/api/atrum/config` and displayed, and a comma-joined string shown as "the RPC" is confusing
+ * at best and copy-pasted into a wallet at worst.
+ */
+export const PUBLIC_RPC_URL = (process.env.NEXT_PUBLIC_RPC_URL ?? "https://testnet-rpc.monad.xyz")
+  .split(",")[0]!
+  .trim();
 
 /**
  * The operator key. Used ONLY for admin work the protocol gives to a named role -- resolving a
