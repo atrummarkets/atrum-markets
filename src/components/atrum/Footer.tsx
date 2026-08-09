@@ -26,6 +26,11 @@ export default function Footer() {
       <Link href="/status" className={linkClass}>
         Status
       </Link>
+      {/* The category research. Internal and linked here rather than in the main nav: it is for
+          people evaluating Atrum, not for someone mid-bet. */}
+      <Link href="/thesis" className={linkClass}>
+        The market
+      </Link>
       {EXTERNAL.map((link) => (
         <a key={link.href} href={link.href} target="_blank" rel="noreferrer" className={linkClass}>
           {link.label}
