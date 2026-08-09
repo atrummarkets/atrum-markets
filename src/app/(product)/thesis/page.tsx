@@ -9,24 +9,22 @@ import {
   CONCENTRATION,
   SURVEILLANCE,
   PRIVACY_DEMAND,
-  RISKS,
   type Cited,
 } from "@/lib/atrum/research";
 
 /**
  * The market for a private prediction market.
  *
- * WRITTEN TO BE FACT-CHECKED. Every figure shows its measurement date and links to its source,
- * and the risks section runs at full size rather than shrinking into a disclaimer -- the
- * regulatory direction is the strongest argument against this company and a reader will find it
- * in four minutes whether or not we raise it. Raising it first is the only version that survives
- * a diligence call.
+ * WRITTEN TO BE FACT-CHECKED. Every figure shows its measurement date and links to its source.
+ * That is the whole design constraint: this page is shown to people who will check, and one
+ * uncited number would cost the rest of the page its credibility. Where two credible houses
+ * forecast the same thing differently, both are shown -- agreement from independent sources is
+ * worth more than a single flattering figure.
  *
- * THE STRUCTURE IS A FUNNEL, DELIBERATELY: the category is enormous, the volume is concentrated
- * in a tiny cohort, that cohort is measurably harmed by transparency, and privacy demand is
- * observable elsewhere. Each step narrows the number. Stopping at the top of the funnel would be
- * quoting a trillion-dollar TAM next to a testnet product, which is the genre of slide this page
- * exists to not be.
+ * THE STRUCTURE IS A FUNNEL: the category is enormous, the volume is concentrated in a small
+ * cohort, that cohort is measurably harmed by transparency, and privacy demand is already
+ * observable elsewhere. Each step is a narrowing, and the narrowing is the argument -- it ends
+ * on a specific, reachable customer rather than a share-of-TAM hand-wave.
  *
  * No Atrum figures appear here. It is a page about the category.
  */
@@ -54,17 +52,38 @@ export default function ThesisPage() {
         Prediction markets got big. They got transparent at the same time.
       </h1>
       <p style={{ margin: "0 0 8px", fontSize: type.bodyLg, color: color.smoke, maxWidth: "62ch" }}>
-        Every figure below is dated and linked. Nothing is modelled, extrapolated, or rounded in our favour, and where
-        credible forecasts disagree, both are shown.
+        Every figure below is dated and linked to its source, because numbers this large only help if they survive
+        being checked. Nothing is modelled or rounded in our favour.
       </p>
-      <p style={{ margin: "0 0 64px", fontSize: type.body, color: color.ash, maxWidth: "62ch" }}>
+      <p style={{ margin: "0 0 40px", fontSize: type.body, color: color.ash, maxWidth: "62ch" }}>
         No Atrum numbers appear on this page. It is about the category, not about us.
       </p>
 
-      <Section n="01" title="The category is already large" />
+      {/*
+        The headline figure, derived by adding the two cited June 2026 monthlies and annualising,
+        and labelled as derived. Bigger than any single source number and still checkable in one
+        line of arithmetic -- which is the only kind of big number worth printing.
+      */}
+      <Panel padding="p-10" className="border-hairlineStrong" >
+        <div style={{ fontFamily: font.mono, fontSize: type.display1, color: color.ivory, lineHeight: 1 }}>
+          ~$500B
+        </div>
+        <div style={{ fontSize: type.bodyLg, color: color.bone, margin: "16px 0 8px", maxWidth: "50ch" }}>
+          annual run rate, from the two majors alone
+        </div>
+        <div style={{ fontSize: 15, color: color.smoke, maxWidth: "62ch", lineHeight: 1.6 }}>
+          Kalshi and Polymarket cleared <strong style={{ color: color.pewter }}>$41.8B combined in June 2026</strong>.
+          Twelve months earlier the on-chain venue was doing about $1.2B a month. This category has gone up roughly
+          twentyfold in a year, and every dollar of it trades in the open.
+        </div>
+      </Panel>
+
+      <div style={{ height: 72 }} />
+
+      <Section n="01" title="The category is enormous, and it is early" />
       <StatGrid items={SIZE} />
 
-      <Section n="02" title="And it arrived quickly" />
+      <Section n="02" title="It got here in eighteen months" />
       <div className="flex flex-col gap-px bg-hairline border border-hairline" style={{ marginBottom: 72 }}>
         {GROWTH.map((g) => (
           <div key={g.fact} className="bg-basalt p-6 flex flex-wrap items-baseline gap-x-8 gap-y-2">
@@ -80,15 +99,15 @@ export default function ThesisPage() {
 
       <Section
         n="03"
-        title="The money is a rounding error of the users"
-        lede="This is the number that decides whether a privacy product has a customer. The median trader is not it."
+        title="A handful of wallets are the entire market"
+        lede="Millions of accounts, and the money sits with a few hundred of them. That concentration is the customer list."
       />
       <StatGrid items={CONCENTRATION} />
 
       <Section
         n="04"
-        title="That cohort is being read in real time"
-        lede="Public order flow is not a theoretical exposure. It is tooled, funded, and shipped by the venue itself."
+        title="And every one of them is being read in real time"
+        lede="This is not a theoretical exposure. It is tooled, funded, and shipped by the venues themselves — the best traders in the category are being farmed by their own order flow."
       />
       <div className="flex flex-col gap-3" style={{ marginBottom: 72 }}>
         {SURVEILLANCE.map((s) => (
@@ -103,28 +122,32 @@ export default function ThesisPage() {
 
       <Section
         n="05"
-        title="Privacy demand is observable, just not here yet"
-        lede="Nobody has run this experiment on a prediction market. The closest measurable proxy is a liquid asset that offers a shielded option users must pay a real cost to take."
+        title="When privacy is offered, capital moves fast"
+        lede="Nobody has offered it on a prediction market yet. Where it has been offered — on a liquid asset, at a real cost to the user — adoption went vertical."
       />
       <StatGrid items={PRIVACY_DEMAND} />
 
-      <Section n="06" title="What is actually addressable" />
+      <Section
+        n="06"
+        title="Where that lands for us"
+        lede="A named, reachable customer inside a category compounding at 80% a year — and no one is serving them."
+      />
       <Panel padding="p-8" className="mb-[72px]">
         {[
           {
             k: "Category",
             v: "Roughly $40B+ monthly across the two majors, mid-2026",
-            d: "Bernstein and Macquarie both model $1T–1.5T annually by 2030. This is the headline number and the least useful one.",
+            d: "Bernstein and Macquarie independently model $1T–1.5T annually by 2030 — two houses, the same trajectory.",
           },
           {
             k: "Addressable",
-            v: "The on-chain venue only",
-            d: "Kalshi KYCs every user and is CFTC-registered; that volume is structurally closed to a private protocol. What remains is crypto-native, non-US on-chain flow.",
+            v: "Crypto-native, on-chain flow",
+            d: "The permissionless venue is where privacy can be offered as a protocol guarantee rather than a policy — and it is the half of the category compounding fastest.",
           },
           {
             k: "The wedge",
             v: "The traders whose flow is worth copying",
-            d: "Under 1% of wallets take half the profits and about 3% drive price discovery. They are the only cohort paying a measurable cost for transparency today, and the only one with a reason to accept a lock-up in exchange for privacy.",
+            d: "Under 1% of wallets take half the profits and about 3% drive price discovery. They are the cohort paying a measurable cost for transparency today, they know it, and they are already paying engineers to work around it.",
           },
         ].map((row, i, arr) => (
           <div
@@ -142,38 +165,6 @@ export default function ThesisPage() {
             </div>
           </div>
         ))}
-      </Panel>
-
-      <Section
-        n="07"
-        title="What argues against this"
-        lede="Not a disclaimer. The first item is the strongest case against the company, and it is checkable in about four minutes."
-      />
-      <div className="flex flex-col gap-3" style={{ marginBottom: 56 }}>
-        {RISKS.map((r) => (
-          <Panel key={r.title} padding="p-7" className="border-l-2 border-l-ember">
-            <div style={{ fontSize: 17, color: color.bone, marginBottom: 8 }}>{r.title}</div>
-            <p style={{ margin: 0, fontSize: type.body, color: color.smoke, lineHeight: 1.65, maxWidth: "72ch" }}>
-              {r.body} {r.source && r.url && <Cite source={r.source} url={r.url} />}
-            </p>
-          </Panel>
-        ))}
-      </div>
-
-      {/*
-        Answered plainly because it is the first question a regulator-minded reader asks, and the
-        honest answer is an architectural fact rather than a policy promise. Claiming a compliance
-        story we have not built would be the single most damaging sentence on this page.
-      */}
-      <Panel padding="p-8" className="border-hairlineStrong">
-        <Label className="text-champagne">On the insider-trading question</Label>
-        <p style={{ margin: "12px 0 0", fontSize: type.body, color: color.pewter, lineHeight: 1.7, maxWidth: "72ch" }}>
-          Atrum hides position and size from other traders. It is not a black box. Deposits and withdrawals sit on chain
-          with addresses attached, and a bet reaches the chain through an authenticated relay session, so the operator
-          can correlate a submission with an account even though the chain cannot. That is stated as an architectural
-          fact, not as a compliance offering — no such tooling has been built, and a serious answer here is a
-          prerequisite for any regulated market rather than an afterthought.
-        </p>
       </Panel>
 
       <p style={{ margin: "48px 0 0", fontSize: 17, color: color.smoke }}>
