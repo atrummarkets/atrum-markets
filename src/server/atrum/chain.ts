@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, http, parseAbi, getAddress, defineChain } from "viem";
+import { createPublicClient, createWalletClient, http, fallback, parseAbi, getAddress, defineChain } from "viem";
 import type { Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { join } from "node:path";
@@ -11,12 +11,45 @@ function env(name: string): string {
 
 export const CHAIN_ID = 10143;
 
+/**
+ * RPC endpoints, highest preference first.
+ *
+ * `RPC_URL` takes a comma-separated list. A single URL still works, so nothing that already
+ * sets one break.
+ *
+ * WHY A LIST. Every read in this app is a plain `eth_call` against a public endpoint, and
+ * public endpoints rate-limit. One `/api/atrum/markets` fans out across every market in the
+ * registry, so a single provider running out of quota takes the whole product down with a 500 --
+ * which is exactly what happened on Ankr's free tier. Rotating means one exhausted provider
+ * costs a retry rather than an outage.
+ */
+const RPC_URLS = env("RPC_URL")
+  .split(",")
+  .map((u) => u.trim())
+  .filter(Boolean);
+
 export const monadTestnet = defineChain({
   id: CHAIN_ID,
   name: "Monad Testnet",
   nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
-  rpcUrls: { default: { http: [env("RPC_URL")] } },
+  rpcUrls: { default: { http: RPC_URLS } },
+  // Canonical Multicall3, verified deployed at this address on Monad testnet. Its presence is
+  // what lets `batch: { multicall: true }` below collapse a fan-out into one request.
+  contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" } },
 });
+
+/**
+ * Rotating transport.
+ *
+ * `rank` re-orders the endpoints by observed latency and success, so a provider that starts
+ * failing is demoted automatically instead of being retried at the front of the queue forever.
+ */
+function rotating() {
+  return fallback(
+    RPC_URLS.map((url) => http(url, { retryCount: 2, retryDelay: 300 })),
+    { rank: RPC_URLS.length > 1 ? { interval: 30_000, sampleCount: 3 } : false },
+  );
+}
 
 export const POOL_ADDRESS = getAddress(env("POOL_ADDRESS"));
 export const COLLATERAL_ADDRESS = getAddress(env("COLLATERAL_ADDRESS"));
@@ -31,7 +64,7 @@ export const SEQUENCER_URL = env("SEQUENCER_URL");
  */
 export const CIRCUITS_DIR = process.env.CIRCUITS_DIR ?? join(process.cwd(), "circuits-build");
 
-/** The public RPC the BROWSER should use. Never the private one -- it carries an API key. */
+/** The public RPC the BROWSER should use. Kept separate from the server list above. */
 export const PUBLIC_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://testnet-rpc.monad.xyz";
 
 /**
@@ -42,8 +75,20 @@ export const PUBLIC_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://testne
 const account = privateKeyToAccount(env("PRIVATE_KEY") as `0x${string}`);
 export const operatorAddress: Address = account.address;
 
-export const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
-export const walletClient = createWalletClient({ chain: monadTestnet, transport: http(), account });
+/**
+ * `batch: { multicall: true }` is the actual fix for the rate limiting, not the rotation.
+ *
+ * Reading the market list issued one `eth_call` per field per market -- 113 requests for an
+ * 18-market registry, every poll, per open tab. Batching coalesces the concurrent ones into a
+ * single `Multicall3.aggregate3` call, so the same page load costs a couple of requests instead
+ * of a hundred. Rotation then covers the case where a provider is unhealthy for other reasons.
+ */
+export const publicClient = createPublicClient({
+  chain: monadTestnet,
+  transport: rotating(),
+  batch: { multicall: { wait: 12 } },
+});
+export const walletClient = createWalletClient({ chain: monadTestnet, transport: rotating(), account });
 
 export const POOL_ABI = parseAbi([
   "function deposit(uint256[2] pA, uint256[2][2] pB, uint256[2] pC, uint256 commitment, uint256 units)",
