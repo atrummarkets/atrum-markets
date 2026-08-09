@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { c, line, fill, font, FLOW_LABELS, FLOW_STEPS, type FlowStep } from "@/lib/atrum/v2/tokens";
+import { c, line, fill, font, FLOW_LABELS, type FlowStep } from "@/lib/atrum/v2/tokens";
 import { scramble, randomCipher, useReducedMotion } from "@/lib/atrum/v2/feel";
 import CrowdCanvas from "./CrowdCanvas";
 import ProofCanvas from "./ProofCanvas";
@@ -99,7 +99,9 @@ export default function FlowOverlay({
     const plain = state.sealPlaintext;
     const started = performance.now();
     const duration = reduced ? 300 : 1300;
-    setSealPhase(0);
+    // Deferred rather than set inline: a synchronous state update in an effect body forces an
+    // extra render pass before paint, and this effect starts an interval that will drive many.
+    const reset = setTimeout(() => setSealPhase(0), 0);
 
     sealTimer.current = setInterval(() => {
       const r = Math.min(1, (performance.now() - started) / duration);
@@ -115,6 +117,7 @@ export default function FlowOverlay({
     }, 45);
 
     return () => {
+      clearTimeout(reset);
       if (sealTimer.current) clearInterval(sealTimer.current);
     };
   }, [step, state.sealPlaintext, reduced]);

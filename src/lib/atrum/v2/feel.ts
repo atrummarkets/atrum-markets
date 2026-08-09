@@ -17,10 +17,15 @@ export function useReducedMotion(): boolean {
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
+    // Deferred by a tick rather than set inline: a state update dispatched synchronously from
+    // an effect body forces an extra render pass before paint.
+    const initial = setTimeout(() => setReduced(mq.matches), 0);
     const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
     mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    return () => {
+      clearTimeout(initial);
+      mq.removeEventListener("change", onChange);
+    };
   }, []);
 
   return reduced;

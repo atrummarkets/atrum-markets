@@ -42,7 +42,11 @@ export default function ProofCanvas({ progress }: { progress: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const tree = useRef<Node[]>(buildTree());
   const progressRef = useRef(progress);
-  progressRef.current = progress;
+  // Synced in an effect, not during render: the animation loop reads this every frame, so a
+  // one-frame lag is invisible, and writing a ref while rendering is not allowed.
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
   const raf = useRef<number | null>(null);
 
   useEffect(() => {

@@ -55,7 +55,11 @@ export default function CrowdCanvas({
   // Read inside the animation loop so progress changes never restart it -- a restart would
   // reseed the crowd and make the set visibly jump.
   const progressRef = useRef(progress);
-  progressRef.current = progress;
+  // Synced in an effect, not during render: the animation loop reads this every frame, so a
+  // one-frame lag is invisible, and writing a ref while rendering is not allowed.
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
 
   useEffect(() => {
     const canvas = ref.current;
