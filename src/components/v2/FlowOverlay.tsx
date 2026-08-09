@@ -1,7 +1,9 @@
 "use client";
 
+import EmblemMark from "@/components/atrum/logo/EmblemMark";
 import { useEffect, useRef, useState } from "react";
 import { c, line, fill, font, FLOW_LABELS, type FlowStep } from "@/lib/atrum/v2/tokens";
+import type { FlowState } from "@/lib/atrum/v2/useFlow";
 import { scramble, randomCipher, useReducedMotion } from "@/lib/atrum/v2/feel";
 import CrowdCanvas from "./CrowdCanvas";
 import ProofCanvas from "./ProofCanvas";
@@ -20,24 +22,7 @@ import ProofCanvas from "./ProofCanvas";
  * ticking two of them off would be theatre.
  */
 
-export interface FlowState {
-  step: FlowStep;
-  /** Which steps this run actually includes. A repeat bettor sees three, not five. */
-  steps: readonly FlowStep[];
-  /** 0..1. Batch assembly, from the real graft poll. */
-  batchProgress: number;
-  /** Live anonymity set size, read from the pool. Never invented. */
-  anonymitySet: number | null;
-  /** 0..1 across artifact download and proving. */
-  proveProgress: number;
-  /** What the prover is doing right now, in its own words. */
-  proveLabel: string;
-  /** Human summary of what is being sealed, e.g. "YES · 100 units · Will BTC…". */
-  sealPlaintext: string;
-  /** Populated once the action lands. */
-  receipt?: { txHash: string; relayer?: string; provingMs?: number };
-  error?: string;
-}
+export type { FlowState } from "@/lib/atrum/v2/useFlow";
 
 const railColor = (i: number, current: number) =>
   i === current ? c.gold : i < current ? c.bright : c.ghost;
@@ -207,8 +192,9 @@ function Deposit({ state, onCancel }: { state: FlowState; onCancel: () => void }
         Collateral leaves your address on-chain, visibly and permanently — the pool pulls it from you, so whoever pays
         is public. Everything after this door is sealed.
       </p>
+      {/* The real step text, so "approve" and "confirm" and "waiting" are not all one label. */}
       <div style={{ fontFamily: font.mono, fontSize: 12, letterSpacing: "0.1em", color: c.gold }}>
-        CONFIRM IN YOUR WALLET…
+        {(state.proveLabel || "Confirm in your wallet").toUpperCase()}…
       </div>
       <div style={{ marginTop: 16 }}>
         <button onClick={onCancel} style={{ background: "none", border: "none", color: c.faint, fontSize: 12, cursor: "pointer" }}>
@@ -268,19 +254,46 @@ function Stat({ value, label, gold }: { value: string; label: string; gold?: boo
 /* ---------------------------------------------------------------- proving */
 
 function Proving({ state }: { state: FlowState }) {
-  // Constraint count is the real figure for bet_encrypted, scaled by real progress -- the
-  // number climbs because work is happening, not because a timer is running.
-  const constraints = Math.round(state.proveProgress * 21252);
+  /*
+    THE BIG NUMBER MUST BE MEASURED, NOT INFERRED.
+
+    An earlier version showed `proveProgress × 21,252` as a live constraint count. Nothing
+    reports per-constraint progress -- snarkjs is opaque between "started" and "done" -- so that
+    figure was a timer wearing a circuit's clothes, on the one screen whose entire job is to be
+    believable about what is happening locally.
+
+    So: while artifacts are downloading, the number is bytes, which is genuinely measured. While
+    the proof runs, the number is elapsed seconds, also measured, with the constraint total
+    stated as the fixed property of the circuit that it is. The lattice keeps moving either way
+    -- it is scenery, and it never carries a quantity.
+  */
+  const d = state.download;
+  const mb = (n: number) => (n / 1_048_576).toFixed(1);
+
   return (
     <div style={{ maxWidth: 640, width: "100%", textAlign: "center", animation: "v2FadeUp .3s ease" }}>
       <ProofCanvas progress={state.proveProgress} />
-      <div style={{ fontFamily: font.mono, fontSize: 38, fontWeight: 500, color: c.text, marginTop: 6 }}>
-        {constraints.toLocaleString("en-US")}
-        <span style={{ fontSize: 14, color: c.faint }}> / 21,252</span>
-      </div>
-      <div style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: "0.14em", color: c.gold, marginTop: 6 }}>
-        {state.proveLabel}
-      </div>
+      {d ? (
+        <>
+          <div style={{ fontFamily: font.mono, fontSize: 38, fontWeight: 500, color: c.text, marginTop: 6 }}>
+            {mb(d.loaded)}
+            <span style={{ fontSize: 14, color: c.faint }}> / {mb(d.total)} MB</span>
+          </div>
+          <div style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: "0.14em", color: c.gold, marginTop: 6 }}>
+            {state.proveLabel} · CACHED AFTER THIS
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ fontFamily: font.mono, fontSize: 38, fontWeight: 500, color: c.text, marginTop: 6 }}>
+            {(state.elapsedMs / 1000).toFixed(1)}
+            <span style={{ fontSize: 14, color: c.faint }}>s</span>
+          </div>
+          <div style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: "0.14em", color: c.gold, marginTop: 6 }}>
+            {state.proveLabel}{state.constraints ? ` · ${state.constraints.toLocaleString("en-US")} CONSTRAINTS` : ""}
+          </div>
+        </>
+      )}
       <p style={{ color: c.dim, fontSize: 13, margin: "14px 0 0" }}>
         This is running on your machine. Nothing secret leaves it.
       </p>
@@ -336,19 +349,36 @@ function Receipt({ state, onDone }: { state: FlowState; onDone: (to: "portfolio"
         <div style={{ width: 64, height: 64, margin: "0 auto 18px", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ position: "absolute", inset: 0, border: `1px solid ${line.goldStrong}`, borderRadius: "50%", animation: "v2RingPulse 1.4s ease-out both" }} />
           <div style={{ width: 44, height: 44, border: `1.5px solid ${c.gold}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ width: 9, height: 9, background: c.gold, transform: "rotate(45deg)" }} />
+            <EmblemMark style={{ height: 20, width: 20 * (691 / 789), color: c.gold }} />
           </div>
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Your bet is placed. Here is what stayed hidden.</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>
+          {state.kind === "deposit"
+            ? "Your note is in the pool. Here is what it looks like from outside."
+            : "Your bet is placed. Here is what stayed hidden."}
+        </h2>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Fact delay=".25s" title="A transaction exists." detail={r?.txHash ?? "—"} />
-        <Fact
-          delay=".55s"
-          title="Your address is not on it."
-          detail={r?.relayer ? `submitted by relayer ${r.relayer}` : "submitted by a relayer"}
-        />
+        {/*
+          A DEPOSIT IS SENT BY THE USER'S OWN WALLET. `transferFrom(msg.sender)` means the payer
+          is public and there is no relayer to hide behind -- saying otherwise here would be the
+          exact false claim the rest of this product is built to avoid.
+        */}
+        {state.kind === "deposit" ? (
+          <Fact
+            delay=".55s"
+            title="Your address IS on this one."
+            detail="deposits are public by construction — what you do with the note is not"
+          />
+        ) : (
+          <Fact
+            delay=".55s"
+            title="Your address is not on it."
+            detail={r?.relayer ? `submitted by relayer ${r.relayer}` : "submitted by a relayer"}
+          />
+        )}
         {state.anonymitySet !== null && (
           <Fact
             delay=".85s"
@@ -361,7 +391,7 @@ function Receipt({ state, onDone }: { state: FlowState; onDone: (to: "portfolio"
           <Fact
             delay="1.1s"
             title="Proved on your machine."
-            detail={`21,252 constraints in ${(r.provingMs / 1000).toFixed(1)}s — no secret left the browser`}
+            detail={`${state.constraints ? `${state.constraints.toLocaleString("en-US")} constraints in ` : ""}${(r.provingMs / 1000).toFixed(1)}s — no secret left the browser`}
           />
         )}
       </div>

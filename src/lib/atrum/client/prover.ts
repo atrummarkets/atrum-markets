@@ -79,6 +79,15 @@ export interface ProveOptions {
   onProgress?: (p: FetchProgress) => void;
   /** Fired once artifacts are in hand and the worker has actually started proving. */
   onProvingStart?: () => void;
+  /**
+   * Fired when the proof is done and the relay call is in flight.
+   *
+   * `prove` never fires this -- the actions in `actions.ts` do, immediately before POSTing to
+   * the relay. It exists because "proving" and "waiting on a relayer" are different waits with
+   * different failure modes, and a UI that shows one label across both is guessing which one
+   * the user is sitting in.
+   */
+  onRelayStart?: () => void;
 }
 
 /**

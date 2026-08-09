@@ -265,6 +265,7 @@ export async function bet(
   });
   await ctx.save();
 
+  options.onRelayStart?.();
   let result: RelayOutcome;
   try {
     result = await relay("betEncrypted", proof, [
@@ -377,6 +378,7 @@ export async function redeem(
   });
   await ctx.save();
 
+  options.onRelayStart?.();
   let result: RelayOutcome;
   try {
     result = await relay("redeemPrivate", proof, [root, rpNullifierHash, settledCommitment, redeemMeta]);
@@ -500,6 +502,7 @@ export async function withdraw(
     await ctx.save();
   }
 
+  options.onRelayStart?.();
   let result: RelayOutcome;
   try {
     result = await relay("withdraw", proof, [root, wdNullifierHash, changeCommitment, withdrawData]);

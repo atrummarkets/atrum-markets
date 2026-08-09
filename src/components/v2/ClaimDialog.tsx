@@ -1,5 +1,6 @@
 "use client";
 
+import EmblemMark from "@/components/atrum/logo/EmblemMark";
 import { useEffect, useRef, useState } from "react";
 import { c, line, fill, font } from "@/lib/atrum/v2/tokens";
 import { scramble, randomCipher, useSounds, useReducedMotion } from "@/lib/atrum/v2/feel";
@@ -156,7 +157,7 @@ export default function ClaimDialog({
                 animation: "v2Gravity .7s ease both",
               }}
             >
-              <div style={{ width: 9, height: 9, background: c.gold, transform: "rotate(45deg)" }} />
+              <EmblemMark style={{ height: 20, width: 20 * (691 / 789), color: c.gold }} />
             </div>
             <h2 style={{ fontSize: 19, fontWeight: 600, margin: "0 0 10px" }}>
               {error ? "That did not go through" : "Sealed. Nobody saw it."}

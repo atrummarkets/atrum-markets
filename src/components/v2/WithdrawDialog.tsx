@@ -1,5 +1,6 @@
 "use client";
 
+import EmblemMark from "@/components/atrum/logo/EmblemMark";
 import { useMemo, useState } from "react";
 import { c, line, fill, font, breakdown, chunkSummary } from "@/lib/atrum/v2/tokens";
 import { useSounds } from "@/lib/atrum/v2/feel";
@@ -85,7 +86,7 @@ export default function WithdrawDialog({
                 animation: "v2Gravity .7s ease both",
               }}
             >
-              <div style={{ width: 9, height: 9, background: c.gold, transform: "rotate(45deg)" }} />
+              <EmblemMark style={{ height: 20, width: 20 * (691 / 789), color: c.gold }} />
             </div>
             <h2 style={{ fontSize: 19, fontWeight: 600, margin: "0 0 12px" }}>Blended into the exits</h2>
             <p style={{ color: c.dim, fontSize: 13, lineHeight: 1.6, margin: "0 0 8px" }}>{done}</p>

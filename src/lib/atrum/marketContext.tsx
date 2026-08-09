@@ -82,6 +82,15 @@ export interface Activity {
    * with no number reads as a hang.
    */
   download?: { loaded: number; total: number };
+  /**
+   * Machine-readable counterpart to `step`.
+   *
+   * `step` is prose written for a human and it changes whenever the copy changes; anything that
+   * branches on it is one wording tweak away from breaking. The v2 flow overlay needs to know
+   * which wait the user is actually sitting in -- fetching artifacts, proving, or blocked on a
+   * relayer -- and each of those has a different honest thing to show.
+   */
+  phase?: "downloading" | "proving" | "relaying" | "wallet" | "confirming";
 }
 
 export interface Receipt {
@@ -280,17 +289,26 @@ export function MarketProvider({ children }: { children: ReactNode }) {
    * Turns worker/download callbacks into the same `step` text the server path used, so the
    * activity overlay needs no knowledge of which prover ran.
    */
+  /** Stamp the machine-readable phase without touching the human-facing `step` prose. */
+  function mark(phase: Activity["phase"]) {
+    setActivity((a) => (a ? { ...a, phase } : a));
+  }
+
   function proveOptions(step: (s: string) => void, what: string) {
     return {
       onProgress: (p: FetchProgress) => {
         if (p.cached) return;
-        setActivity((a) => (a ? { ...a, download: { loaded: p.loaded, total: p.total } } : a));
+        setActivity((a) => (a ? { ...a, download: { loaded: p.loaded, total: p.total }, phase: "downloading" } : a));
         const pct = p.total ? Math.round((p.loaded / p.total) * 100) : 0;
         step(`Downloading the ${what} circuit (${pct}%) — cached after this`);
       },
       onProvingStart: () => {
-        setActivity((a) => (a ? { ...a, download: undefined } : a));
+        setActivity((a) => (a ? { ...a, download: undefined, phase: "proving" } : a));
         step(`Proving ${what} in your browser`);
+      },
+      onRelayStart: () => {
+        setActivity((a) => (a ? { ...a, phase: "relaying" } : a));
+        step("Proof done — a relayer is submitting it");
       },
     };
   }
@@ -311,6 +329,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
           account: address,
         });
         step("Waiting for confirmation");
+        mark("confirming");
         await publicClient.waitForTransactionReceipt({ hash });
         pushReceipt({ kind: "deposit", txHash: hash, detail: `Minted ${units} test ${config.token.symbol}` });
       }),
@@ -325,6 +344,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         if (!address) throw new Error("connect your wallet first");
 
         step(`Proving deposit (${config.circuits.deposit.constraints.toLocaleString()} constraints)`);
+        mark("proving");
         const prepared = CLIENT_PROVING
           ? await clientActions.prepareDeposit(
               await vault.context(),
@@ -356,6 +376,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
 
         if (allowance < raw) {
           step("Approve the pool to move your collateral");
+          mark("wallet");
           const approveHash = await (await walletClient()).writeContract({
             address: config.collateral,
             abi: ERC20_ABI,
@@ -365,10 +386,12 @@ export function MarketProvider({ children }: { children: ReactNode }) {
             account: address,
           });
           step("Waiting for the approval");
+          mark("confirming");
           await publicClient.waitForTransactionReceipt({ hash: approveHash });
         }
 
         step("Confirm the deposit in your wallet");
+        mark("wallet");
         const hash = await (await walletClient()).writeContract({
           address: config.pool,
           abi: DEPOSIT_ABI,
@@ -389,6 +412,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
           account: address,
         });
         step("Waiting for confirmation");
+        mark("confirming");
         const rc = await publicClient.waitForTransactionReceipt({ hash });
         if (rc.status !== "success") throw new Error("the deposit transaction reverted");
         if (CLIENT_PROVING) {

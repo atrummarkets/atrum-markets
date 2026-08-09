@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import EmblemMark from "@/components/atrum/logo/EmblemMark";
+import LockupMark from "@/components/atrum/logo/LockupMark";
 import { usePathname } from "next/navigation";
 import { c, line, font } from "@/lib/atrum/v2/tokens";
 import { useMarket } from "@/lib/atrum/marketContext";
@@ -65,10 +67,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           zIndex: 40,
         }}
       >
+        {/*
+          The real brand marks, not a placeholder square. Both are inline SVG with
+          `fill="currentColor"`, so the emblem takes the gold and the wordmark takes the ivory
+          from `color` here rather than needing two recolored raster files.
+        */}
         <Link href="/v2" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: c.text }}>
-          {/* The Atrum mark: a rotated square, same geometry as the emblem used elsewhere. */}
-          <div style={{ width: 14, height: 14, border: `1.5px solid ${c.gold}`, transform: "rotate(45deg)" }} />
-          <div style={{ fontWeight: 600, letterSpacing: "0.22em", fontSize: 15 }}>ATRUM</div>
+          <EmblemMark style={{ height: 18, width: 18 * (691 / 789), display: "block", color: c.gold }} />
+          <LockupMark style={{ height: 13, width: 13 * (1154 / 357), display: "block" }} />
         </Link>
 
         <nav style={{ display: "flex", gap: 4, flex: 1 }}>

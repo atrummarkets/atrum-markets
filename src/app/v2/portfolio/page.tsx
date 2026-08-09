@@ -1,5 +1,6 @@
 "use client";
 
+import EmblemMark from "@/components/atrum/logo/EmblemMark";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { c, line, fill, font, noteState, type NoteStateKey } from "@/lib/atrum/v2/tokens";
@@ -304,7 +305,7 @@ function Centered({
                 animation: "v2Breathe 3s ease-in-out infinite",
               }}
             >
-              <div style={{ width: 10, height: 10, background: c.gold, transform: "rotate(45deg)" }} />
+              <EmblemMark style={{ height: 24, width: 24 * (691 / 789), color: c.gold }} />
             </div>
           </div>
         )}

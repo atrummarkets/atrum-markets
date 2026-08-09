@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { c, line, fill, font, DENOMINATIONS } from "@/lib/atrum/v2/tokens";
 import { impliedYesPct, centsFor, closesIn, project } from "@/lib/atrum/v2/odds";
 import { useSounds } from "@/lib/atrum/v2/feel";
 import { useMarket } from "@/lib/atrum/marketContext";
+import { useFlow } from "@/lib/atrum/v2/useFlow";
+import FlowOverlay from "@/components/v2/FlowOverlay";
 import { useWallet } from "@/lib/atrum/wallet";
 import { useDetailMode } from "@/lib/atrum/detailMode";
 
@@ -29,6 +31,8 @@ export default function V2MarketPage() {
   const marketId = Number(params.id);
   const { markets, config, notes, clientProving, vaultUnlocked, unlockVault, bet, activity, error } = useMarket();
   const { session, connect } = useWallet();
+  const flow = useFlow();
+  const router = useRouter();
   const { mode } = useDetailMode();
   const detail = mode === "detailed";
   const { thunk } = useSounds();
@@ -50,8 +54,12 @@ export default function V2MarketPage() {
     thunk();
     // The note is chosen by exact denomination, so a bet always spends one whole note --
     // there is no partial spend in the protocol.
-    if (readyNote) void bet(readyNote.id, market.marketId, side === "YES" ? "yes" : "no");
-  }, [market, readyNote, side, bet, thunk]);
+    if (!readyNote) return;
+    // The overlay opens BEFORE the action so the artifact download -- the longest wait, and the
+    // one with no wallet prompt to explain it -- is not spent staring at an unchanged screen.
+    flow.begin("bet", `${side} · ${stake} UNITS · ${market.question.toUpperCase().slice(0, 40)}`);
+    void bet(readyNote.id, market.marketId, side === "YES" ? "yes" : "no");
+  }, [market, readyNote, side, stake, bet, thunk, flow]);
 
   const startHold = useCallback(() => {
     if (!market || activity || stake <= 0) return;
@@ -303,6 +311,17 @@ export default function V2MarketPage() {
           {error && <Notice tone={c.red}>{error}</Notice>}
         </div>
       </div>
+
+      {flow.state && (
+        <FlowOverlay
+          state={flow.state}
+          onCancel={flow.close}
+          onDone={(to) => {
+            flow.close();
+            router.push(to === "portfolio" ? "/v2/portfolio" : "/v2");
+          }}
+        />
+      )}
     </main>
   );
 }
