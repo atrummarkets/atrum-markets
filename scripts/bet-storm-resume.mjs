@@ -27,14 +27,26 @@ if (!Number.isFinite(MARKET_ID)) {
   process.exit(1);
 }
 
-const RPC_URL = process.env.RPC_URL ?? "https://rpc.ankr.com/monad_testnet";
+/**
+ * RPC endpoints, highest preference first.
+ *
+ * RPC_URL may hold a comma-separated LIST -- the app reads it that way so one exhausted
+ * provider costs a retry rather than an outage. These scripts share .env.local with the app
+ * (they are run with --env-file=.env.local), so they have to split it too. Handing the whole
+ * comma string to http() would produce one unreachable URL and fail every call.
+ */
+const RPC_URLS = (process.env.RPC_URL ?? "https://rpc.ankr.com/monad_testnet")
+  .split(",")
+  .map((u) => u.trim())
+  .filter(Boolean);
+const RPC_URL = RPC_URLS[0];
 const BASE_URL = process.env.BASE_URL ?? "https://markets.atrum.fun";
 
 const monadTestnet = defineChain({
   id: 10143,
   name: "Monad Testnet",
   nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
-  rpcUrls: { default: { http: [RPC_URL] } },
+  rpcUrls: { default: { http: RPC_URLS } },
 });
 
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });

@@ -167,7 +167,39 @@ export async function readMarket(id: number): Promise<MarketSnapshot> {
   return readOne(entry);
 }
 
+/**
+ * How long a market snapshot is reused.
+ *
+ * The browser polls every 5s, so this is deliberately shorter than one poll -- a user never
+ * sees data older than they would have anyway. What it removes is the multiplier: two tabs, or
+ * a tab plus the sweep script, previously meant two full fan-outs at the same instant.
+ */
+const SNAPSHOT_TTL_MS = 3_000;
+
+let snapshotCache: { at: number; value: MarketSnapshot[] } | null = null;
+/** In-flight read, shared by every caller that arrives while it is running. */
+let snapshotInFlight: Promise<MarketSnapshot[]> | null = null;
+
 export async function readAllMarkets(): Promise<MarketSnapshot[]> {
+  const now = Date.now();
+  if (snapshotCache && now - snapshotCache.at < SNAPSHOT_TTL_MS) return snapshotCache.value;
+  // SINGLE FLIGHT. Concurrent callers await the same read rather than each starting their own;
+  // without this the cache does nothing for the case it exists to fix, which is several
+  // requests landing together on a cold cache.
+  if (snapshotInFlight) return snapshotInFlight;
+
+  snapshotInFlight = readAllMarketsUncached()
+    .then((value) => {
+      snapshotCache = { at: Date.now(), value };
+      return value;
+    })
+    .finally(() => {
+      snapshotInFlight = null;
+    });
+  return snapshotInFlight;
+}
+
+async function readAllMarketsUncached(): Promise<MarketSnapshot[]> {
   const { markets } = await loadRegistry();
   const snapshots = await Promise.all(markets.map(readOne));
   // Open markets first, closing soonest at the top; everything decided sinks to the bottom.
