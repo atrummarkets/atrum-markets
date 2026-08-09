@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Syne, Barlow_Condensed, Manrope, Geist_Mono } from "next/font/google";
+import { Syne, Barlow_Condensed, Manrope, Geist_Mono, Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
@@ -27,6 +27,25 @@ const geistMono = Geist_Mono({
   weight: ["300", "400", "500"],
 });
 
+/**
+ * The v2 typeface pair, from the Claude Design prototype.
+ *
+ * Self-hosted through next/font rather than the prototype's <link> to Google Fonts: an external
+ * stylesheet is a render-blocking round trip on first paint, and this app's first paint is a
+ * market list someone is deciding whether to trust.
+ */
+const instrumentSans = Instrument_Sans({
+  variable: "--font-instrument-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+});
+
 export const metadata: Metadata = {
   title: "ATRUM — Private Prediction Markets",
   description: "Wager in silence. No visible book, no name on the ledger, no crowd to copy you.",
@@ -44,7 +63,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html
       lang="en"
-      className={`${syne.variable} ${barlowCondensed.variable} ${manrope.variable} ${geistMono.variable}`}
+      className={`${syne.variable} ${barlowCondensed.variable} ${manrope.variable} ${geistMono.variable} ${instrumentSans.variable} ${ibmPlexMono.variable}`}
     >
       <body>
         {children}

@@ -244,6 +244,17 @@
       "bettingCloseTime": 1786084641,
       "resolutionStartTime": 1786084941,
       "createdAt": 1786082841
+    },
+    {
+      "id": 57,
+      "question": "[SWARM] 10-minute market",
+      "category": "Monad",
+      "resolverType": "manual",
+      "vault": "0xdC784f55214F12cC7c2e0D907F57F0b89B5Af888",
+      "resolver": "0x364EDC06254874e62FF4AD8fA4d9a45238cb5609",
+      "bettingCloseTime": 1786221645,
+      "resolutionStartTime": 1786221945,
+      "createdAt": 1786221045
     }
   ]
 }
