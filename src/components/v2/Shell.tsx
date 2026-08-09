@@ -25,6 +25,7 @@ const NAV = [
   { href: "/v2", label: "Markets" },
   { href: "/v2/portfolio", label: "Portfolio" },
   { href: "/v2/transfer", label: "Deposit / Withdraw" },
+  { href: "/v2/privacy", label: "Privacy" },
 ] as const;
 
 function short(addr: string) {
