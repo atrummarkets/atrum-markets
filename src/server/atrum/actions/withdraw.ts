@@ -6,6 +6,7 @@ import { relay } from "../relay";
 import { fetchPath } from "../sequencerClient";
 import { getNote, addNote, updateNote, removeNote } from "../noteStore";
 import { publicClient, POOL_ADDRESS, POOL_ABI } from "../chain";
+import { recordEvent } from "../analytics";
 
 function randomField(): bigint {
   return BigInt("0x" + randomBytes(31).toString("hex")) % FIELD_SIZE;
@@ -133,6 +134,11 @@ export async function withdraw(
 
   if (changeId) await updateNote(owner, changeId, { txHash: result.hash });
   await updateNote(owner, spent.id, { status: "spent" });
+  void recordEvent({
+    eventType: "withdrawal",
+    units: amountBig,
+    detail: unbetExit ? "unbet_collateral" : "settled_payout",
+  });
 
   return {
     changeId,

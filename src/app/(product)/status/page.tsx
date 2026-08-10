@@ -225,7 +225,10 @@ export default function StatusPage() {
         <>
           <h2 style={{ fontSize: 20, margin: "40px 0 8px", color: color.ivory }}>Operations</h2>
           <p style={{ color: color.ash, fontSize: 13, marginBottom: 20 }}>
-            Visible because this wallet is the operator.
+            Visible because this wallet is the operator.{" "}
+            <a href="/status/analytics" style={{ color: color.bone }}>
+              Analytics →
+            </a>
           </p>
 
           <div style={{ ...panel, borderColor: health.healthy ? color.hairline : color.ember }}>

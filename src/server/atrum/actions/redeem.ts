@@ -5,6 +5,7 @@ import { relay } from "../relay";
 import { fetchPath } from "../sequencerClient";
 import { getNote, addNote, updateNote, removeNote } from "../noteStore";
 import { readMarket } from "../markets";
+import { recordEvent } from "../analytics";
 
 function randomField(): bigint {
   return BigInt("0x" + randomBytes(31).toString("hex")) % FIELD_SIZE;
@@ -108,6 +109,12 @@ export async function redeem(owner: string, noteId: string): Promise<RedeemResul
 
   await updateNote(owner, id, { txHash: result.hash });
   await updateNote(owner, spent.id, { status: "spent" });
+  void recordEvent({
+    eventType: "redeem_payout",
+    marketId,
+    side: positionOutcome === OUTCOME_YES ? "yes" : "no",
+    units: payout,
+  });
 
   return {
     id,

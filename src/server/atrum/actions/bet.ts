@@ -7,6 +7,7 @@ import { relay } from "../relay";
 import { fetchPath } from "../sequencerClient";
 import { getNote, addNote, updateNote, removeNote } from "../noteStore";
 import { readMarket } from "../markets";
+import { recordEvent } from "../analytics";
 
 
 
@@ -119,6 +120,7 @@ export async function bet(
   await updateNote(owner, id, { txHash: result.hash });
   // Mark the spent note spent only after confirmation.
   await updateNote(owner, spent.id, { status: "spent" });
+  void recordEvent({ eventType: "bet_placed", marketId, side, units });
 
   return {
     id,

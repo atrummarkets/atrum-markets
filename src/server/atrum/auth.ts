@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { verifyMessage, getAddress } from "viem";
 import { db } from "./db";
 import { operatorAddress } from "./chain";
+import { recordWalletSeen } from "./analytics";
 
 /**
  * Signature-based sessions.
@@ -115,6 +116,7 @@ export async function currentUser(): Promise<string | null> {
 export async function requireUser(): Promise<string> {
   const user = await currentUser();
   if (!user) throw new Error("not signed in -- connect your wallet");
+  void recordWalletSeen(user);
   return user;
 }
 

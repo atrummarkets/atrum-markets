@@ -96,6 +96,29 @@ const STATEMENTS = [
     blob text NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`,
+  // Aggregate, address-free event ledger for the ops dashboard. No owner/commitment/
+  // nullifier/tx_hash column, ever -- that's what keeps this table structurally
+  // unable to link a wallet to a bet amount or payout amount. See analytics.ts.
+  `CREATE TABLE IF NOT EXISTS analytics_events (
+    id bigserial PRIMARY KEY,
+    event_type text NOT NULL,
+    market_id integer,
+    outcome_side text,
+    units numeric,
+    detail text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS analytics_events_type_created_idx ON analytics_events (event_type, created_at)`,
+  `CREATE INDEX IF NOT EXISTS analytics_events_market_idx ON analytics_events (market_id) WHERE market_id IS NOT NULL`,
+  // Wallet presence only, one row per address per active day. No amount/market column,
+  // ever -- pairs with analytics_events above without ever joining to it by address.
+  `CREATE TABLE IF NOT EXISTS wallet_daily_activity (
+    address text NOT NULL,
+    activity_date date NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (address, activity_date)
+  )`,
+  `CREATE INDEX IF NOT EXISTS wallet_daily_activity_date_idx ON wallet_daily_activity (activity_date)`,
 ];
 
 for (const sql of STATEMENTS) {

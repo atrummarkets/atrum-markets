@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { init, noteCommitment, FIELD_SIZE, isValidDenomination, DENOMINATIONS } from "../atrum.mjs";
 import { prove } from "../prove";
 import { addNote, updateNote, getNote } from "../noteStore";
+import { publicClient, POOL_ADDRESS } from "../chain";
+import { recordEvent } from "../analytics";
 
 function randomField(): bigint {
   return BigInt("0x" + randomBytes(31).toString("hex")) % FIELD_SIZE;
@@ -80,8 +82,23 @@ export async function prepareDeposit(owner: string, units: number): Promise<Prep
   };
 }
 
-/** Record the hash once the user's wallet has actually landed the deposit. */
+/**
+ * Record the hash once the user's wallet has actually landed the deposit.
+ *
+ * `txHash` is client-supplied and otherwise untrusted -- this is the one deposit-path value
+ * nobody relays or otherwise re-verifies server-side. Confirming a real, successful,
+ * on-pool receipt here (rather than trusting the string) is what stops a fabricated hash
+ * from inflating deposit volume in analytics_events for free.
+ */
 export async function confirmDeposit(owner: string, id: string, txHash: string): Promise<void> {
-  await getNote(owner, id);
+  const note = await getNote(owner, id);
+
+  const receipt = await publicClient.getTransactionReceipt({ hash: txHash as `0x${string}` });
+  if (receipt.status !== "success") throw new Error("that transaction did not succeed");
+  if (receipt.to?.toLowerCase() !== POOL_ADDRESS.toLowerCase()) {
+    throw new Error("that transaction was not a deposit into this pool");
+  }
+
   await updateNote(owner, id, { txHash });
+  void recordEvent({ eventType: "deposit_confirmed", units: note.units });
 }

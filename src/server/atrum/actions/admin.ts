@@ -14,6 +14,7 @@ import {
   OUTCOME_NO,
 } from "../chain";
 import { registryMarket } from "../registry";
+import { recordEvent } from "../analytics";
 
 
 const DECRYPT_BOUND = 10_000_000n;
@@ -142,6 +143,9 @@ export async function settleMarket(
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error(`publishFinalTotals reverted: ${hash}`);
+
+  void recordEvent({ eventType: "market_settled", marketId, side: "yes", units: yes.total });
+  void recordEvent({ eventType: "market_settled", marketId, side: "no", units: no.total });
 
   return { txHash: hash, yes: yes.total.toString(), no: no.total.toString() };
 }
