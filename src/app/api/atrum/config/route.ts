@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { POOL_ADDRESS, COLLATERAL_ADDRESS, CHAIN_ID, PUBLIC_RPC_URL, publicClient, ERC20_ABI, POOL_ABI, operatorAddress } from "@/server/atrum/chain";
+import { POOL_ADDRESS, COLLATERAL_ADDRESS, CHAIN_ID, PUBLIC_RPC_URL, publicClient, ERC20_ABI, POOL_ABI, operatorAddress, operatorAddresses } from "@/server/atrum/chain";
 import { readPool } from "@/server/atrum/markets";
 import { circuitFacts } from "@/server/atrum/circuits";
 import { committeeKey } from "@/server/atrum/committee";
@@ -30,6 +30,9 @@ export async function GET() {
       // `resolver` stored in each demo market's Vault. Served so the UI can hide operator
       // controls from everyone else; the routes enforce it regardless.
       operator: operatorAddress,
+      // Every wallet requireOperator() accepts, not just the signer above -- lets the UI show
+      // operator controls to EXTRA_OPERATOR_ADDRESSES too. The routes enforce it regardless.
+      operators: operatorAddresses,
       // The PUBLIC half of the committee key. A browser proving its own bet has to encrypt the
       // stake to it, so this is not optional and not a leak -- it is the encryption target,
       // published for exactly that purpose. The secret half stays server-side, where

@@ -2,7 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { verifyMessage, getAddress } from "viem";
 import { db } from "./db";
-import { operatorAddress } from "./chain";
+import { isOperatorAddress } from "./chain";
 import { recordWalletSeen } from "./analytics";
 
 /**
@@ -133,12 +133,14 @@ export async function requireUser(): Promise<string> {
  * browser. A secret the browser must hold to call the endpoint is a secret the browser hands
  * to anyone who opens devtools, which is not a gate.
  *
- * `operatorAddress` is derived from the same `PRIVATE_KEY` that signs the resolve, so this
- * cannot drift out of agreement with who is actually authorised on chain.
+ * The signing address is derived from `PRIVATE_KEY`, so that one entry cannot drift out of
+ * agreement with who is actually authorised to resolve on chain. Additional addresses
+ * (`EXTRA_OPERATOR_ADDRESSES`) get the same access without holding that key -- every admin
+ * write still executes as the signer regardless of which of these wallets triggered it.
  */
 export async function requireOperator(): Promise<string> {
   const user = await requireUser();
-  if (user.toLowerCase() !== operatorAddress.toLowerCase()) {
+  if (!isOperatorAddress(user)) {
     throw new Error("not authorised -- this action is operator-only");
   }
   return user;

@@ -84,6 +84,29 @@ const account = privateKeyToAccount(env("PRIVATE_KEY") as `0x${string}`);
 export const operatorAddress: Address = account.address;
 
 /**
+ * Wallets allowed through `requireOperator()`, beyond the signer above.
+ *
+ * Granting operator ACCESS (viewing analytics/health, triggering resolve/settle) is a
+ * different thing from holding the signing KEY: every admin write still executes with
+ * `account` above regardless of which browser session triggered it, so adding a wallet here
+ * never hands out `PRIVATE_KEY` -- it only lets that wallet's session pass the auth check.
+ *
+ * `EXTRA_OPERATOR_ADDRESSES` is optional and comma-separated, same convention as `RPC_URL`.
+ */
+const extraOperators = (process.env.EXTRA_OPERATOR_ADDRESSES ?? "")
+  .split(",")
+  .map((a) => a.trim())
+  .filter(Boolean)
+  .map((a) => getAddress(a));
+
+export const operatorAddresses: Address[] = [account.address, ...extraOperators];
+
+export function isOperatorAddress(address: string): boolean {
+  const lower = address.toLowerCase();
+  return operatorAddresses.some((a) => a.toLowerCase() === lower);
+}
+
+/**
  * `batch: { multicall: true }` is the actual fix for the rate limiting, not the rotation.
  *
  * Reading the market list issued one `eth_call` per field per market -- 113 requests for an

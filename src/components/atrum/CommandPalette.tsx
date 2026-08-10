@@ -23,7 +23,8 @@ export default function CommandPalette() {
   const { markets, config } = useMarket();
   const { session } = useWallet();
 
-  const isOperator = !!session && !!config?.operator && session.toLowerCase() === config.operator.toLowerCase();
+  const isOperator =
+    !!session && !!config?.operators?.some((a) => a.toLowerCase() === session.toLowerCase());
 
   useEffect(() => {
     function onKeydown(e: KeyboardEvent) {

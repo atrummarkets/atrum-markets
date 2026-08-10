@@ -40,6 +40,8 @@ export interface AppConfig {
   poolState: PoolState;
   /** The operator EOA. Resolve/settle are restricted to it; the UI hides its controls. */
   operator: `0x${string}`;
+  /** Every wallet allowed operator access, including `operator` above. */
+  operators: `0x${string}`[];
   circuits: Record<"deposit" | "bet" | "redeem" | "withdraw", CircuitFacts>;
   /**
    * The PUBLIC half of the committee key, as decimal strings. A browser proving its own bet

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { autoResolveDue } from "@/server/atrum/actions/autoResolve";
 import { currentUser } from "@/server/atrum/auth";
-import { operatorAddress } from "@/server/atrum/chain";
+import { isOperatorAddress } from "@/server/atrum/chain";
 
 /**
  * Sweep due oracle markets. Meant to be called on a schedule.
@@ -39,7 +39,7 @@ function secretMatches(header: string | null): boolean {
 async function authorised(req: Request): Promise<boolean> {
   if (secretMatches(req.headers.get("authorization"))) return true;
   const user = await currentUser();
-  return !!user && user.toLowerCase() === operatorAddress.toLowerCase();
+  return !!user && isOperatorAddress(user);
 }
 
 async function handle(req: Request) {

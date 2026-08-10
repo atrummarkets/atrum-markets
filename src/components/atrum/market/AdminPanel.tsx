@@ -34,7 +34,7 @@ export default function AdminPanel({ market, now }: { market: LiveMarket; now: n
   const [err, setErr] = useState<string | null>(null);
 
   const isOperator =
-    !!session && !!config?.operator && session.toLowerCase() === config.operator.toLowerCase();
+    !!session && !!config?.operators?.some((a) => a.toLowerCase() === session.toLowerCase());
 
   const resolvable = market.phase === "closed" && now >= market.resolutionStartTime;
   const settleable = market.phase === "resolved";

@@ -84,7 +84,7 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const isOperator =
-    !!session && !!config?.operator && session.toLowerCase() === config.operator.toLowerCase();
+    !!session && !!config?.operators?.some((a) => a.toLowerCase() === session.toLowerCase());
 
   const load = useCallback(async () => {
     if (!isOperator) return;
