@@ -176,6 +176,20 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   // would add a render pass and a second source of truth for the same list.
   const exposedNotes: LiveNote[] = CLIENT_PROVING ? (vault.notes as LiveNote[]) : notes;
 
+  /**
+   * The note list, readable from inside a memoized action.
+   *
+   * STALE CLOSURES BROKE CLAIMING. `redeem` is memoized on [config, refresh], so the
+   * `exposedNotes` array it captured belongs to the render that created it. A note that arrived
+   * afterwards -- which is every note, since deposits land asynchronously -- was invisible to
+   * the lookup, and the old `?? 0` fallback turned that miss into a request for market 0. The
+   * user saw "market 0 is not in the registry" while looking at a perfectly valid winning note.
+   */
+  const notesRef = useRef<LiveNote[]>([]);
+  useEffect(() => {
+    notesRef.current = exposedNotes;
+  }, [exposedNotes]);
+
   const refresh = useCallback(() => {
     fetchMarkets()
       .then((d) => {
@@ -452,7 +466,13 @@ export function MarketProvider({ children }: { children: ReactNode }) {
           // The circuit's divisors must be the SETTLED totals, and the contract pins them --
           // so they are read fresh here rather than taken from the polled market list, which
           // can be up to POLL_MS stale and would prove against numbers the contract rejects.
-          const { market } = await fetchMarket(Number(exposedNotes.find((n) => n.id === noteId)?.marketId ?? 0));
+          // Read through the ref, never the captured array -- see notesRef above.
+          const held = notesRef.current.find((n) => n.id === noteId);
+          // No silent `?? 0`: a missing note is a bug in the caller, and market 0 does not
+          // exist, so defaulting to it only converted a clear failure into a confusing one.
+          if (!held) throw new Error("that note is not in your vault -- try reloading");
+          if (held.marketId === "0") throw new Error("that note is not on a market, so there is nothing to claim");
+          const { market } = await fetchMarket(Number(held.marketId));
           r = await clientActions.redeem(await vault.context(), noteId, market, proveOptions(step, "the redemption"));
         } else {
           r = await doRedeem(noteId);
